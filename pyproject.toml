@@ -1,11 +1,11 @@
 [tool.poetry]
-name = "project_name"
+name = "spotify_playlist_generator"
 version = "0.0.7"
 description = "Starter template for Kaiano's Python projects with CI, pre-commit, coverage, and shared utils."
 authors = ["Kaiano Levine <kaiano@example.com>"]
 license = "MIT"
 readme = "README.md"
-packages = [{ include = "project_name", from = "src" }]
+packages = [{ include = "spotify_playlist_generator", from = "src" }]
 
 [tool.poetry.dependencies]
 python = ">=3.10,<4.0"

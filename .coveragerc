@@ -1,6 +1,6 @@
 [run]
 branch = True
-source = project_name
+source = spotify_playlist_generator
 
 [report]
 fail_under = 90
