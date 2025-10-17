@@ -172,9 +172,14 @@ def test_process_file_skips_processed(mocker, mock_services):
     file = {"name": "file.m3u", "id": "123"}
     processed_map = {"file.m3u": "line123"}
     mocker.patch("kaiano_common_utils.google_drive.download_file")
+    mocker.patch(
+        "kaiano_common_utils.m3u_parsing.parse_m3u", return_value=[]
+    )  # ⬅️ added line
     mock_log = mocker.patch("spotify_playlist_generator.sync.log_to_sheets")
     mock_update = mocker.patch("spotify_playlist_generator.sync.update_spotify")
+
     sync.process_file(file, processed_map, sheet_service, spreadsheet_id, drive_service)
+
     mock_log.assert_not_called()
     mock_update.assert_not_called()
 
