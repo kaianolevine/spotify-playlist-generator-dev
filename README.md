@@ -100,5 +100,3 @@ Creates `dist/*.whl` and `dist/*.tar.gz` (no `poetry.lock` committed by default)
 
 ## 🧾 License
 MIT © 2025 Kaiano Levine
-
-This project was initialized from the python-project-template (version unknown).
