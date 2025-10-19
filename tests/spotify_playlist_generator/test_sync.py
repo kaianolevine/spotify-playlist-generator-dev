@@ -26,7 +26,7 @@ def test_initialize_spreadsheet_deletes_sheet1(mocker):
         return_value={"sheets": [{"properties": {"title": "Sheet1", "sheetId": 123}}]},
     )
     mocker.patch("kaiano_common_utils.google_sheets.delete_sheet_by_name")
-    sync.initialize_spreadsheet()
+    sync.initialize_logging_spreadsheet()
     core = pytest.importorskip("kaiano_common_utils.google_sheets")
     core.delete_sheet_by_name.assert_called_once()
 
@@ -202,7 +202,7 @@ def test_main_full_flow_mocks_everything(mocker):
     )
     mocker.patch("kaiano_common_utils.config.HISTORY_TO_SPOTIFY_LOGGING", "mock_id")
     mocker.patch("kaiano_common_utils.config.VDJ_HISTORY_FOLDER_ID", "mock_folder")
-    mocker.patch("spotify_playlist_generator.sync.initialize_spreadsheet")
+    mocker.patch("spotify_playlist_generator.sync.initialize_logging_spreadsheet")
     mocker.patch(
         "spotify_playlist_generator.sync.get_m3u_files",
         return_value=[{"name": "f.m3u", "id": "1"}],
@@ -213,7 +213,7 @@ def test_main_full_flow_mocks_everything(mocker):
 
     sync.main()
 
-    sync.initialize_spreadsheet.assert_called_once()
+    sync.initialize_logging_spreadsheet.assert_called_once()
     sync.get_m3u_files.assert_called_once()
     sync.process_file.assert_called_once()
     core = pytest.importorskip("kaiano_common_utils.google_sheets")
@@ -229,7 +229,7 @@ def test_main_handles_no_files(mocker):
     )
     mocker.patch("kaiano_common_utils.config.HISTORY_TO_SPOTIFY_LOGGING", "mock_id")
     mocker.patch("kaiano_common_utils.config.VDJ_HISTORY_FOLDER_ID", "mock_folder")
-    mocker.patch("spotify_playlist_generator.sync.initialize_spreadsheet")
+    mocker.patch("spotify_playlist_generator.sync.initialize_logging_spreadsheet")
     mocker.patch("spotify_playlist_generator.sync.get_m3u_files", return_value=[])
     mock_log = mocker.patch("kaiano_common_utils.google_sheets.log_info_sheet")
     sync.main()
