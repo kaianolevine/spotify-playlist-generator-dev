@@ -17,7 +17,7 @@ log = log.get_logger()
 spreadsheet_id = config.HISTORY_TO_SPOTIFY_LOGGING
 
 
-def initialize_spreadsheet():
+def initialize_logging_spreadsheet():
     """Ensure necessary sheets exist and remove default 'Sheet1' if present."""
     sheet_service = sheets.get_sheets_service()
 
@@ -119,13 +119,11 @@ def log_to_sheets(
     )
 
     # Log Songs Added
-    sheet = sheets.read_sheet(spreadsheet_id, "Songs Added")
+    sheet = sheets.read_sheet(sheet_service, spreadsheet_id, "Songs Added")
     log.debug(f"📋 Loaded sheet: {sheet}")
 
     for (artist, title), uri in zip(matched_songs, found_uris):
-        log.debug(
-            spreadsheet_id, f"📝 Would log synced track: {date}, {title} - {artist}"
-        )
+        log.debug(f"📝 Would log synced track: {date}, {title} - {artist}")
     rows_to_append = [[date, title, artist] for (artist, title) in matched_songs]
     if rows_to_append:
         log.debug(f"🧪 Writing {len(rows_to_append)} rows to sheet...")
@@ -138,6 +136,7 @@ def log_to_sheets(
 
     # Log unfound tracks info messages
     for artist, title, _ in unfound:
+        log.debug(f"-------------🧪 Artist: {artist}, Title: {title}")
         sheets.log_info_sheet(
             sheet_service,
             spreadsheet_id,
@@ -147,6 +146,7 @@ def log_to_sheets(
     # Log unfound songs to "Songs Not Found"
     unfound_rows = [[date, title, artist] for artist, title, _ in unfound]
     if unfound_rows:
+        log.debug(f"-------------🧪 Unfound Tracks: {len(unfound_rows)}")
         try:
             sheets.append_rows(spreadsheet_id, "Songs Not Found", unfound_rows)
         except Exception as e:
@@ -156,22 +156,31 @@ def log_to_sheets(
     last_logged_extvdj_line = new_songs[-1][2] if new_songs else last_extvdj_line
     updated_row = [filename, date, last_logged_extvdj_line]
     try:
-        all_rows = sheets.read_sheet(spreadsheet_id, "Processed!A2:C")
+        log.debug(f"-------------Updating Processed log: {updated_row}")
+        log.debug(f"-------------Last logged ExtVDJ line: {last_logged_extvdj_line}")
+        all_rows = sheets.read_sheet(sheet_service, spreadsheet_id, "Processed!A2:C")
+        log.debug(f"-------------all rows: {all_rows}")
         filenames = [row[0] for row in all_rows]
+        log.debug(f"-------------all filenames: {filenames}")
         if filename in filenames:
+            log.debug(f"-------------Found filename in processed: {filename}")
             row_index = filenames.index(filename) + 2  # account for header
+            log.debug(f"-------------Updating row {row_index} in Processed")
             sheets.update_row(
                 spreadsheet_id,
                 f"Processed!A{row_index}:C{row_index}",
                 [updated_row],
             )
         else:
-            sheets.append_rows(spreadsheet_id, "Processed", [updated_row])
+            sheets.append_rows(
+                sheet_service, spreadsheet_id, "Processed", [updated_row]
+            )
+            log.debug(f"-------------Appended new row to Processed: {updated_row}")
         sheets.sort_sheet_by_column(
             spreadsheet_id, "Processed", column_index=2, descending=True
         )
     except Exception as e:
-        log.debug(f"Failed to update Processed log: {e}")
+        log.debug(f"-------------Failed to update Processed log: {e}")
 
 
 def process_file(file, processed_map, sheet_service, spreadsheet_id, drive_service):
@@ -227,7 +236,7 @@ def main():
     spreadsheet_id = config.HISTORY_TO_SPOTIFY_LOGGING
     log_start(sheet_service, spreadsheet_id)
 
-    initialize_spreadsheet()
+    initialize_logging_spreadsheet()
 
     folder_id = config.VDJ_HISTORY_FOLDER_ID
     if not folder_id:
