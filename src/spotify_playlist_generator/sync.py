@@ -101,6 +101,33 @@ def update_spotify(found_uris):
         log.debug(f"Error updating Spotify playlist: {e}")
 
 
+def create_spotify_playlist_for_file(date_str: str, found_uris: list[str]) -> str:
+    playlist_name = f"{date_str} History Set"
+    log.debug(f"🎵🎵🎵🎵🎵🎵🎵🎵🎵🎵 Creating Spotify playlist: {playlist_name}")
+    try:
+        playlist_id = spotify.create_playlist(playlist_name)
+        if not playlist_id:
+            log.debug(
+                f"❌❌❌❌❌❌❌❌❌❌❌ Failed to create playlist: {playlist_name}"
+            )
+            return None
+        unique_uris = list(dict.fromkeys(found_uris))
+        duplicates_count = len(found_uris) - len(unique_uris)
+        log.debug(
+            f"🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍 Removing duplicates: {duplicates_count} duplicates removed."
+        )
+        spotify.add_tracks_to_specific_playlist(playlist_id, unique_uris)
+        log.debug(
+            f"✅✅✅✅✅✅✅✅✅✅✅✅ Created playlist {playlist_name} with ID {playlist_id} containing {len(unique_uris)} tracks."
+        )
+        return playlist_id
+    except Exception as e:
+        log.debug(
+            f"❌❌❌❌❌❌❌❌❌❌❌ Exception while creating Spotify playlist {playlist_name}: {e}"
+        )
+        return None
+
+
 def log_to_sheets(
     sheet_service,
     spreadsheet_id,
@@ -111,6 +138,7 @@ def log_to_sheets(
     filename,
     new_songs,
     last_extvdj_line,
+    playlist_id=None,
 ):
     sheets.log_info_sheet(
         sheet_service,
@@ -154,7 +182,11 @@ def log_to_sheets(
 
     # Log processing summary to "Processed" tab
     last_logged_extvdj_line = new_songs[-1][2] if new_songs else last_extvdj_line
-    updated_row = [filename, date, last_logged_extvdj_line]
+    if playlist_id:
+        updated_row = [filename, date, last_logged_extvdj_line, playlist_id]
+        log.debug(f"-------------Logging playlist ID in Processed sheet: {playlist_id}")
+    else:
+        updated_row = [filename, date, last_logged_extvdj_line]
     try:
         log.debug(f"-------------Updating Processed log: {updated_row}")
         log.debug(f"-------------Last logged ExtVDJ line: {last_logged_extvdj_line}")
@@ -218,6 +250,14 @@ def process_file(file, processed_map, sheet_service, spreadsheet_id, drive_servi
 
     update_spotify(found_uris)
 
+    playlist_id = create_spotify_playlist_for_file(date, found_uris)
+    if playlist_id:
+        log.debug(
+            f"✅ ---------------Playlist created successfully with ID: {playlist_id}"
+        )
+    else:
+        log.debug(f"❌ ---------------Playlist creation failed for date: {date}")
+
     log_to_sheets(
         sheet_service,
         spreadsheet_id,
@@ -228,6 +268,7 @@ def process_file(file, processed_map, sheet_service, spreadsheet_id, drive_servi
         filename,
         new_songs,
         last_extvdj_line,
+        playlist_id=playlist_id,
     )
 
 
