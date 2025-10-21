@@ -6,14 +6,14 @@ from spotipy import SpotifyOAuth
 load_dotenv()
 
 sp_oauth = SpotifyOAuth(
-    client_id=config.SPOTIFY_CLIENT_ID,
-    client_secret=config.SPOTIFY_CLIENT_SECRET,
-    redirect_uri=config.SPOTIFY_REDIRECT_URI,
+    client_id=config.SPOTIPY_CLIENT_ID,
+    client_secret=config.SPOTIPY_CLIENT_SECRET,
+    redirect_uri=config.SPOTIPY_REDIRECT_URI,
     scope="playlist-modify-public playlist-modify-private",
     open_browser=True,  # Set to False if you'd prefer a manual link
 )
 
-token_info = sp_oauth.get_access_token(as_dict=True)
+token_info = sp_oauth.get_cached_token()
 
 if token_info:
     print("✅ REFRESH TOKEN:", token_info.get("refresh_token"))
