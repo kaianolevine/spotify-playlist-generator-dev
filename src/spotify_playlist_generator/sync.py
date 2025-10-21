@@ -49,9 +49,9 @@ def initialize_logging_spreadsheet():
             sheet_id = sheet_info.get("properties", {}).get("sheetId", None)
             if title == "Sheet1" and sheet_id is not None:
                 sheets.delete_sheet_by_name(sheet_service, spreadsheet_id, "Sheet1")
-                log.debug("🗑 Deleted default 'Sheet1'.")
+                log.info("🗑 Deleted default 'Sheet1'.")
     except HttpError as e:
-        log.debug(f"⚠️ Failed to delete 'Sheet1': {e}")
+        log.error(f"⚠️ Failed to delete 'Sheet1': {e}")
 
 
 def log_start(sheet_service, spreadsheet_id):
@@ -60,7 +60,7 @@ def log_start(sheet_service, spreadsheet_id):
         spreadsheet_id,
         f"🔄 Starting Westie Radio sync at {datetime.now().replace(microsecond=0).isoformat()}...",
     )
-    log.debug("Starting debug logging for Westie Radio sync.")
+    log.info("Starting debug logging for Westie Radio sync.")
 
 
 def get_m3u_files(drive_service, folder_id):
@@ -98,7 +98,7 @@ def update_spotify(found_uris):
         spotify.add_tracks_to_playlist(found_uris)
         spotify.trim_playlist_to_limit()
     except Exception as e:
-        log.debug(f"Error updating Spotify playlist: {e}")
+        log.error(f"Error updating Spotify playlist: {e}")
 
 
 def create_spotify_playlist_for_file(date_str: str, found_uris: list[str]) -> str:
@@ -107,7 +107,7 @@ def create_spotify_playlist_for_file(date_str: str, found_uris: list[str]) -> st
     try:
         playlist_id = spotify.create_playlist(playlist_name)
         if not playlist_id:
-            log.debug(
+            log.error(
                 f"❌❌❌❌❌❌❌❌❌❌❌ Failed to create playlist: {playlist_name}"
             )
             return None
@@ -122,7 +122,7 @@ def create_spotify_playlist_for_file(date_str: str, found_uris: list[str]) -> st
         )
         return playlist_id
     except Exception as e:
-        log.debug(
+        log.error(
             f"❌❌❌❌❌❌❌❌❌❌❌ Exception while creating Spotify playlist {playlist_name}: {e}"
         )
         return None
@@ -158,7 +158,7 @@ def log_to_sheets(
         try:
             sheets.append_rows(spreadsheet_id, "Songs Added", rows_to_append)
         except Exception as e:
-            log.debug(f"Failed to append to Songs Added: {e}")
+            log.error(f"Failed to append to Songs Added: {e}")
     else:
         log.debug("🧪 No rows to write to Songs Added.")
 
@@ -178,7 +178,7 @@ def log_to_sheets(
         try:
             sheets.append_rows(spreadsheet_id, "Songs Not Found", unfound_rows)
         except Exception as e:
-            log.debug(f"Failed to append to Songs Not Found: {e}")
+            log.error(f"Failed to append to Songs Not Found: {e}")
 
     # Log processing summary to "Processed" tab
     last_logged_extvdj_line = new_songs[-1][2] if new_songs else last_extvdj_line
@@ -212,7 +212,7 @@ def log_to_sheets(
             spreadsheet_id, "Processed", column_index=2, descending=True
         )
     except Exception as e:
-        log.debug(f"-------------Failed to update Processed log: {e}")
+        log.error(f"-------------Failed to update Processed log: {e}")
 
 
 def process_file(file, processed_map, sheet_service, spreadsheet_id, drive_service):
@@ -252,11 +252,11 @@ def process_file(file, processed_map, sheet_service, spreadsheet_id, drive_servi
 
     playlist_id = create_spotify_playlist_for_file(date, found_uris)
     if playlist_id:
-        log.debug(
+        log.info(
             f"✅ ---------------Playlist created successfully with ID: {playlist_id}"
         )
     else:
-        log.debug(f"❌ ---------------Playlist creation failed for date: {date}")
+        log.error(f"❌ ---------------Playlist creation failed for date: {date}")
 
     log_to_sheets(
         sheet_service,
@@ -281,8 +281,9 @@ def main():
 
     folder_id = config.VDJ_HISTORY_FOLDER_ID
     if not folder_id:
+        log.critical("Missing environment variable: VDJ_HISTORY_FOLDER_ID")
         raise ValueError("Missing environment variable: VDJ_HISTORY_FOLDER_ID")
-    log.debug(f"📁 Loaded VDJ_HISTORY_FOLDER_ID: {folder_id}")
+    log.info(f"📁 Loaded VDJ_HISTORY_FOLDER_ID: {folder_id}")
 
     drive_service = drive.get_drive_service()
     m3u_files = get_m3u_files(drive_service, folder_id)
@@ -297,6 +298,7 @@ def main():
         process_file(file, processed_map, sheet_service, spreadsheet_id, drive_service)
 
     sheets.log_info_sheet(sheet_service, spreadsheet_id, "✅ Sync complete.")
+    log.info("✅ Sync complete.")
 
 
 if __name__ == "__main__":
