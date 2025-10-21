@@ -13,7 +13,7 @@ sp_oauth = SpotifyOAuth(
     open_browser=True,  # Set to False if you'd prefer a manual link
 )
 
-token_info = sp_oauth.get_cached_token()
+token_info = sp_oauth.get_access_token(as_dict=True)
 
 if token_info:
     print("✅ REFRESH TOKEN:", token_info.get("refresh_token"))
