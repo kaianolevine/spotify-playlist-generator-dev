@@ -345,8 +345,14 @@ def maintain_featured_playlist(sp):
 
         playlist_id = playlist["id"]
 
+        # Get current user ID for playlist modifications
+        user_id = sp.current_user()["id"]
+        log.debug(
+            f"Updating playlist details for user_id={user_id}, playlist_id={playlist_id}"
+        )
         # Ensure visibility
         sp.user_playlist_change_details(
+            user_id,
             playlist_id,
             public=True,
             description="Official Deejay Marvel Radio – auto-refreshed and shuffled daily 🎧",
