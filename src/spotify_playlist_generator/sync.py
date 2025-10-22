@@ -172,7 +172,7 @@ def log_to_sheets(
     if unfound_rows:
         log.debug(f"🧪 Unfound Tracks: {len(unfound_rows)}")
         try:
-            sheets.append_rows(spreadsheet_id, "Songs Not Found", unfound_rows)
+            sheets.append_rows(sheet_service, spreadsheet_id, "Songs Not Found", unfound_rows)
         except Exception as e:
             log.error(f"Failed to append to Songs Not Found: {e}")
 
@@ -205,7 +205,7 @@ def log_to_sheets(
             )
             log.debug(f"Appended new row to Processed: {updated_row}")
         sheets.sort_sheet_by_column(
-            spreadsheet_id, "Processed", column_index=2, ascending=False
+            sheet_service, spreadsheet_id, "Processed", column_index=2, ascending=False
         )
     except Exception as e:
         log.error(f"Failed to update Processed log: {e}")
