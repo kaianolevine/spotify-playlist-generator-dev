@@ -373,6 +373,13 @@ def maintain_featured_playlist(sp):
         sp.user_playlist_change_details(
             user_id,
             playlist_id,
+            public=False,
+            description="Official Deejay Marvel Radio – auto-refreshed and shuffled daily 🎧",
+        )
+        # Ensure visibility
+        sp.user_playlist_change_details(
+            user_id,
+            playlist_id,
             public=True,
             description="Official Deejay Marvel Radio – auto-refreshed and shuffled daily 🎧",
         )
