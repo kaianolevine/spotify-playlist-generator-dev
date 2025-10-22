@@ -102,6 +102,10 @@ def update_spotify_radio_playlist(found_uris):
 
 
 def create_spotify_playlist_for_file(date_str: str, found_uris: list[str]) -> str:
+    if not found_uris:
+        log.warning("No URIs provided; skipping playlist creation.")
+        return None
+
     playlist_name = f"{date_str} History Set"
     log.debug(f"🎵 Preparing to create/update Spotify playlist: {playlist_name}")
     try:

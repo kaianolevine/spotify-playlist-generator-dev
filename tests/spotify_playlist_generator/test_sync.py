@@ -38,6 +38,11 @@ def mock_spotify(monkeypatch):
     monkeypatch.setattr(sync.spotify, "create_playlist", MagicMock())
     monkeypatch.setattr(sync.spotify, "add_tracks_to_specific_playlist", MagicMock())
     monkeypatch.setattr(sync.spotify, "search_track", MagicMock())
+    monkeypatch.setattr(
+        sync.spotify,
+        "find_playlist_by_name",
+        MagicMock(return_value={"id": "playlist_id"}),
+    )
     return sync.spotify
 
 
@@ -156,9 +161,9 @@ def test_process_new_songs_variants(
     assert result == expected_new_songs
 
 
-def test_update_spotify_success_and_exception(mock_spotify, caplog):
+def test_update_spotify_radio_playlist_success_and_exception(mock_spotify, caplog):
     # success
-    sync.update_spotify(["uri1", "uri2"])
+    sync.update_spotify_radio_playlist(["uri1", "uri2"])
     mock_spotify.add_tracks_to_playlist.assert_called_once_with(["uri1", "uri2"])
     mock_spotify.trim_playlist_to_limit.assert_called_once()
 
@@ -166,39 +171,9 @@ def test_update_spotify_success_and_exception(mock_spotify, caplog):
     mock_spotify.add_tracks_to_playlist.side_effect = Exception("fail")
     mock_spotify.trim_playlist_to_limit.reset_mock()
     with caplog.at_level("ERROR"):
-        sync.update_spotify(["uri1"])
+        sync.update_spotify_radio_playlist(["uri1"])
     assert "Error updating Spotify playlist: fail" in caplog.text
     mock_spotify.trim_playlist_to_limit.assert_not_called()
-
-
-def test_create_spotify_playlist_for_file_success_failure_exception(
-    mock_spotify, caplog
-):
-    # success
-    mock_spotify.create_playlist.return_value = "playlist_id"
-    mock_spotify.add_tracks_to_specific_playlist.reset_mock()
-    uris = ["uri1", "uri2", "uri1"]
-    with caplog.at_level("DEBUG"):
-        playlist_id = sync.create_spotify_playlist_for_file("2023-01-01", uris)
-    assert playlist_id == "playlist_id"
-    mock_spotify.create_playlist.assert_called_once_with("2023-01-01 History Set")
-    mock_spotify.add_tracks_to_specific_playlist.assert_called_once_with(
-        "playlist_id", ["uri1", "uri2"]
-    )
-
-    # failure (no playlist id)
-    mock_spotify.create_playlist.return_value = None
-    with caplog.at_level("ERROR"):
-        playlist_id = sync.create_spotify_playlist_for_file("2023-01-02", uris)
-    assert playlist_id is None
-    assert "Failed to create playlist" in caplog.text
-
-    # exception
-    mock_spotify.create_playlist.side_effect = Exception("error")
-    with caplog.at_level("ERROR"):
-        playlist_id = sync.create_spotify_playlist_for_file("2023-01-03", uris)
-    assert playlist_id is None
-    assert "Exception while creating Spotify playlist" in caplog.text
 
 
 def test_log_to_sheets_append_and_update_flows(mock_sheets, caplog):
@@ -307,14 +282,14 @@ def test_initialize_logging_spreadsheet_handles_no_metadata(monkeypatch):
     sync.initialize_logging_spreadsheet()  # should not raise
 
 
-def test_update_spotify_handles_trim_exception(monkeypatch):
+def test_update_spotify_radio_playlist_handles_trim_exception(monkeypatch):
     monkeypatch.setattr(sync.spotify, "add_tracks_to_playlist", lambda _: None)
 
     def fail_trim():
         raise Exception("trim failed")
 
     monkeypatch.setattr(sync.spotify, "trim_playlist_to_limit", fail_trim)
-    sync.update_spotify(["uri1"])  # should log error
+    sync.update_spotify_radio_playlist(["uri1"])  # should log error
 
 
 def test_create_playlist_no_uris(monkeypatch):
