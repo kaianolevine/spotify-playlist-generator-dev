@@ -103,27 +103,27 @@ def update_spotify(found_uris):
 
 def create_spotify_playlist_for_file(date_str: str, found_uris: list[str]) -> str:
     playlist_name = f"{date_str} History Set"
-    log.debug(f"🎵🎵🎵🎵🎵🎵🎵🎵🎵🎵 Creating Spotify playlist: {playlist_name}")
+    log.debug(f"🎵 Creating Spotify playlist: {playlist_name}")
     try:
         playlist_id = spotify.create_playlist(playlist_name)
         if not playlist_id:
             log.error(
-                f"❌❌❌❌❌❌❌❌❌❌❌ Failed to create playlist: {playlist_name}"
+                f"❌ Failed to create playlist: {playlist_name}"
             )
             return None
         unique_uris = list(dict.fromkeys(found_uris))
         duplicates_count = len(found_uris) - len(unique_uris)
         log.debug(
-            f"🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍 Removing duplicates: {duplicates_count} duplicates removed."
+            f"🔍 Removing duplicates: {duplicates_count} duplicates removed."
         )
         spotify.add_tracks_to_specific_playlist(playlist_id, unique_uris)
         log.debug(
-            f"✅✅✅✅✅✅✅✅✅✅✅✅ Created playlist {playlist_name} with ID {playlist_id} containing {len(unique_uris)} tracks."
+            f"✅ Created playlist {playlist_name} with ID {playlist_id} containing {len(unique_uris)} tracks."
         )
         return playlist_id
     except Exception as e:
         log.error(
-            f"❌❌❌❌❌❌❌❌❌❌❌ Exception while creating Spotify playlist {playlist_name}: {e}"
+            f"❌ Exception while creating Spotify playlist {playlist_name}: {e}"
         )
         return None
 
@@ -156,7 +156,7 @@ def log_to_sheets(
     if rows_to_append:
         log.debug(f"🧪 Writing {len(rows_to_append)} rows to sheet...")
         try:
-            sheets.append_rows(spreadsheet_id, "Songs Added", rows_to_append)
+            sheets.append_rows(sheet_service, spreadsheet_id, "Songs Added", rows_to_append)
         except Exception as e:
             log.error(f"Failed to append to Songs Added: {e}")
     else:
@@ -164,7 +164,7 @@ def log_to_sheets(
 
     # Log unfound tracks info messages
     for artist, title, _ in unfound:
-        log.debug(f"-------------🧪 Artist: {artist}, Title: {title}")
+        log.debug(f"🧪 Artist: {artist}, Title: {title}")
         sheets.log_info_sheet(
             sheet_service,
             spreadsheet_id,
@@ -174,7 +174,7 @@ def log_to_sheets(
     # Log unfound songs to "Songs Not Found"
     unfound_rows = [[date, title, artist] for artist, title, _ in unfound]
     if unfound_rows:
-        log.debug(f"-------------🧪 Unfound Tracks: {len(unfound_rows)}")
+        log.debug(f"🧪 Unfound Tracks: {len(unfound_rows)}")
         try:
             sheets.append_rows(spreadsheet_id, "Songs Not Found", unfound_rows)
         except Exception as e:
@@ -184,20 +184,20 @@ def log_to_sheets(
     last_logged_extvdj_line = new_songs[-1][2] if new_songs else last_extvdj_line
     if playlist_id:
         updated_row = [filename, date, last_logged_extvdj_line, playlist_id]
-        log.debug(f"-------------Logging playlist ID in Processed sheet: {playlist_id}")
+        log.debug(f"Logging playlist ID in Processed sheet: {playlist_id}")
     else:
         updated_row = [filename, date, last_logged_extvdj_line]
     try:
-        log.debug(f"-------------Updating Processed log: {updated_row}")
-        log.debug(f"-------------Last logged ExtVDJ line: {last_logged_extvdj_line}")
+        log.debug(f"Updating Processed log: {updated_row}")
+        log.debug(f"Last logged ExtVDJ line: {last_logged_extvdj_line}")
         all_rows = sheets.read_sheet(sheet_service, spreadsheet_id, "Processed!A2:C")
-        log.debug(f"-------------all rows: {all_rows}")
+        log.debug(f"all rows: {all_rows}")
         filenames = [row[0] for row in all_rows]
-        log.debug(f"-------------all filenames: {filenames}")
+        log.debug(f"all filenames: {filenames}")
         if filename in filenames:
-            log.debug(f"-------------Found filename in processed: {filename}")
+            log.debug(f"Found filename in processed: {filename}")
             row_index = filenames.index(filename) + 2  # account for header
-            log.debug(f"-------------Updating row {row_index} in Processed")
+            log.debug(f"Updating row {row_index} in Processed")
             sheets.update_row(
                 spreadsheet_id,
                 f"Processed!A{row_index}:C{row_index}",
@@ -207,12 +207,12 @@ def log_to_sheets(
             sheets.append_rows(
                 sheet_service, spreadsheet_id, "Processed", [updated_row]
             )
-            log.debug(f"-------------Appended new row to Processed: {updated_row}")
+            log.debug(f"Appended new row to Processed: {updated_row}")
         sheets.sort_sheet_by_column(
-            spreadsheet_id, "Processed", column_index=2, descending=True
+            spreadsheet_id, "Processed", column_index=2, ascending=False
         )
     except Exception as e:
-        log.error(f"-------------Failed to update Processed log: {e}")
+        log.error(f"Failed to update Processed log: {e}")
 
 
 def process_file(file, processed_map, sheet_service, spreadsheet_id, drive_service):
@@ -253,10 +253,10 @@ def process_file(file, processed_map, sheet_service, spreadsheet_id, drive_servi
     playlist_id = create_spotify_playlist_for_file(date, found_uris)
     if playlist_id:
         log.info(
-            f"✅ ---------------Playlist created successfully with ID: {playlist_id}"
+            f"✅ Playlist created successfully with ID: {playlist_id}"
         )
     else:
-        log.error(f"❌ ---------------Playlist creation failed for date: {date}")
+        log.error(f"❌ Playlist creation failed for date: {date}")
 
     log_to_sheets(
         sheet_service,
