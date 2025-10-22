@@ -107,24 +107,18 @@ def create_spotify_playlist_for_file(date_str: str, found_uris: list[str]) -> st
     try:
         playlist_id = spotify.create_playlist(playlist_name)
         if not playlist_id:
-            log.error(
-                f"❌ Failed to create playlist: {playlist_name}"
-            )
+            log.error(f"❌ Failed to create playlist: {playlist_name}")
             return None
         unique_uris = list(dict.fromkeys(found_uris))
         duplicates_count = len(found_uris) - len(unique_uris)
-        log.debug(
-            f"🔍 Removing duplicates: {duplicates_count} duplicates removed."
-        )
+        log.debug(f"🔍 Removing duplicates: {duplicates_count} duplicates removed.")
         spotify.add_tracks_to_specific_playlist(playlist_id, unique_uris)
         log.debug(
             f"✅ Created playlist {playlist_name} with ID {playlist_id} containing {len(unique_uris)} tracks."
         )
         return playlist_id
     except Exception as e:
-        log.error(
-            f"❌ Exception while creating Spotify playlist {playlist_name}: {e}"
-        )
+        log.error(f"❌ Exception while creating Spotify playlist {playlist_name}: {e}")
         return None
 
 
@@ -156,7 +150,9 @@ def log_to_sheets(
     if rows_to_append:
         log.debug(f"🧪 Writing {len(rows_to_append)} rows to sheet...")
         try:
-            sheets.append_rows(sheet_service, spreadsheet_id, "Songs Added", rows_to_append)
+            sheets.append_rows(
+                sheet_service, spreadsheet_id, "Songs Added", rows_to_append
+            )
         except Exception as e:
             log.error(f"Failed to append to Songs Added: {e}")
     else:
@@ -252,9 +248,7 @@ def process_file(file, processed_map, sheet_service, spreadsheet_id, drive_servi
 
     playlist_id = create_spotify_playlist_for_file(date, found_uris)
     if playlist_id:
-        log.info(
-            f"✅ Playlist created successfully with ID: {playlist_id}"
-        )
+        log.info(f"✅ Playlist created successfully with ID: {playlist_id}")
     else:
         log.error(f"❌ Playlist creation failed for date: {date}")
 
