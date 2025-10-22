@@ -373,6 +373,10 @@ def maintain_featured_playlist(sp):
             public=False,
             description="Official Deejay Marvel Radio – auto-refreshed and shuffled daily 🎧",
         )
+
+        # Randomize order
+        randomize_playlist_order(sp, playlist_id)
+
         # Ensure visibility
         sp.user_playlist_change_details(
             user_id,
@@ -380,9 +384,6 @@ def maintain_featured_playlist(sp):
             public=True,
             description="Official Deejay Marvel Radio – auto-refreshed and shuffled daily 🎧",
         )
-
-        # Randomize order
-        randomize_playlist_order(sp, playlist_id)
 
         # Update modification timestamp to keep it high on profile
         log.debug(
