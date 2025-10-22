@@ -309,6 +309,63 @@ def process_file(file, processed_map, sheet_service, spreadsheet_id, drive_servi
     )
 
 
+def randomize_playlist_order(sp, playlist_id):
+    """Shuffle all tracks in a playlist randomly."""
+    try:
+        results = sp.playlist_tracks(playlist_id)
+        track_uris = [
+            item["track"]["uri"] for item in results["items"] if item.get("track")
+        ]
+
+        if not track_uris:
+            log.warning(f"⚠️ Playlist {playlist_id} has no tracks to shuffle.")
+            return
+
+        import random
+
+        random.shuffle(track_uris)
+
+        # Replace the entire playlist with the shuffled order
+        sp.playlist_replace_items(playlist_id, track_uris)
+        log.info(f"🔀 Shuffled {len(track_uris)} tracks in playlist {playlist_id}.")
+    except Exception as e:
+        log.error(f"❌ Failed to shuffle playlist {playlist_id}: {e}", exc_info=True)
+
+
+def maintain_featured_playlist(sp):
+    """Ensure Deejay Marvel Radio stays public, visible, and randomized."""
+    featured_name = "Deejay Marvel Radio"
+    try:
+        playlist = spotify.find_playlist_by_name(featured_name)
+        if not playlist:
+            log.warning(
+                f"⚠️ Featured playlist '{featured_name}' not found; skipping pin refresh."
+            )
+            return
+
+        playlist_id = playlist["id"]
+
+        # Ensure visibility
+        sp.user_playlist_change_details(
+            playlist_id,
+            public=True,
+            description="Official Deejay Marvel Radio – auto-refreshed and shuffled daily 🎧",
+        )
+
+        # Randomize order
+        randomize_playlist_order(sp, playlist_id)
+
+        # Update modification timestamp to keep it high on profile
+        log.debug(
+            f"🔝 Refreshed featured playlist '{featured_name}' (ID: {playlist_id})."
+        )
+    except Exception as e:
+        log.error(
+            f"❌ Failed to maintain featured playlist '{featured_name}': {e}",
+            exc_info=True,
+        )
+
+
 def main():
     sheet_service = sheets.get_sheets_service()
     spreadsheet_id = config.HISTORY_TO_SPOTIFY_LOGGING
@@ -334,6 +391,9 @@ def main():
     for file in m3u_files:
         process_file(file, processed_map, sheet_service, spreadsheet_id, drive_service)
 
+    log.info("Randomizing main Spotify radio playlist...")
+    sp = spotify.get_spotify_client_from_refresh()
+    maintain_featured_playlist(sp)
     sheets.log_info_sheet(sheet_service, spreadsheet_id, "✅ Sync complete.")
     log.info("✅ Sync complete.")
 
