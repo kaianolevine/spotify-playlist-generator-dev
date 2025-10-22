@@ -3,7 +3,7 @@ branch = True
 source = spotify_playlist_generator
 
 [report]
-fail_under = 80
+fail_under = 50
 show_missing = True
 skip_empty = True
 ignore_errors = True

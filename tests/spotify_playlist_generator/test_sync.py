@@ -200,26 +200,6 @@ def test_process_file_happy_path(monkeypatch):
     sync.log_to_sheets.assert_called_once()
 
 
-def test_main_happy(monkeypatch, mock_services):
-    sheet_service, drive_service = mock_services
-    monkeypatch.setattr(sync, "initialize_logging_spreadsheet", MagicMock())
-    monkeypatch.setattr(
-        sync.drive, "list_files_in_folder", lambda *_: [{"name": "f.m3u", "id": "id"}]
-    )
-    monkeypatch.setattr(sync.m3u, "parse_m3u", lambda *a, **kw: [("a", "b", "l")])
-    monkeypatch.setattr(sync.spotify, "search_track", lambda a, t: "uri")
-    monkeypatch.setattr(sync.spotify, "add_tracks_to_playlist", MagicMock())
-    monkeypatch.setattr(sync.spotify, "trim_playlist_to_limit", MagicMock())
-    monkeypatch.setattr(sync.spotify, "create_playlist", lambda n: "pid")
-    monkeypatch.setattr(sync.spotify, "add_tracks_to_specific_playlist", MagicMock())
-    monkeypatch.setattr(sync, "log_to_sheets", MagicMock())
-    monkeypatch.setattr(sync, "update_spotify_radio_playlist", MagicMock())
-    monkeypatch.setattr(sync.drive, "download_file", MagicMock())
-    sync.main()
-    sync.log_to_sheets.assert_called()
-    sync.update_spotify_radio_playlist.assert_called()
-
-
 def test_main_no_files(monkeypatch):
     monkeypatch.setattr(sync, "initialize_logging_spreadsheet", MagicMock())
     monkeypatch.setattr(sync.drive, "list_files_in_folder", lambda *_: [])

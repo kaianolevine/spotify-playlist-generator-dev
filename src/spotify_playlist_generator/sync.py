@@ -352,11 +352,15 @@ def maintain_featured_playlist(sp):
     featured_name = "Deejay Marvel Radio"
     try:
         playlist = spotify.find_playlist_by_name(featured_name)
-        if not playlist or not playlist["name"].startswith(featured_name):
+        # find_playlist_by_name returns a dict with keys "id" and "data"
+        # The name is in playlist["data"]["name"]
+        if not playlist or not playlist["data"]["name"].startswith(featured_name):
             log.warning(
                 f"⚠️ Featured playlist '{featured_name}' not found; skipping pin refresh."
             )
             return
+
+        log.debug(f"Matched featured playlist name prefix: {playlist['data']['name']}")
 
         playlist_id = playlist["id"]
 
@@ -378,7 +382,7 @@ def maintain_featured_playlist(sp):
 
         # Update modification timestamp to keep it high on profile
         log.debug(
-            f"🔝 Refreshed featured playlist '{featured_name}' (ID: {playlist_id})."
+            f"🔝 Refreshed featured playlist '{playlist['data']['name']}' (ID: {playlist_id})."
         )
     except Exception as e:
         log.error(
