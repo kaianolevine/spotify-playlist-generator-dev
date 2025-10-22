@@ -327,7 +327,22 @@ def randomize_playlist_order(sp, playlist_id):
 
         # Replace the entire playlist with the shuffled order
         sp.playlist_replace_items(playlist_id, track_uris)
-        log.info(f"🔀 Shuffled {len(track_uris)} tracks in playlist {playlist_id}.")
+        # Get current local time formatted
+        current_time = datetime.now().strftime("%H:%M")
+        # Get original playlist name prefix
+        original_name = sp.playlist(playlist_id)["name"].split("–")[0].strip()
+        new_name = f"{original_name} – {current_time}"
+        # Update playlist name and ensure public
+        user_id = sp.current_user()["id"]
+        sp.user_playlist_change_details(
+            user_id,
+            playlist_id,
+            public=True,
+            name=new_name,
+        )
+        log.info(
+            f"🔀 Shuffled {len(track_uris)} tracks in playlist {playlist_id} and updated name to '{new_name}'."
+        )
     except Exception as e:
         log.error(f"❌ Failed to shuffle playlist {playlist_id}: {e}", exc_info=True)
 
@@ -337,7 +352,7 @@ def maintain_featured_playlist(sp):
     featured_name = "Deejay Marvel Radio"
     try:
         playlist = spotify.find_playlist_by_name(featured_name)
-        if not playlist:
+        if not playlist or not playlist["name"].startswith(featured_name):
             log.warning(
                 f"⚠️ Featured playlist '{featured_name}' not found; skipping pin refresh."
             )
