@@ -93,7 +93,7 @@ def process_new_songs(songs, last_extvdj_line):
     return new_songs
 
 
-def update_spotify(found_uris):
+def update_spotify_radio_playlist(found_uris):
     try:
         spotify.add_tracks_to_playlist(found_uris)
         spotify.trim_playlist_to_limit()
@@ -103,22 +103,59 @@ def update_spotify(found_uris):
 
 def create_spotify_playlist_for_file(date_str: str, found_uris: list[str]) -> str:
     playlist_name = f"{date_str} History Set"
-    log.debug(f"🎵 Creating Spotify playlist: {playlist_name}")
+    log.debug(f"🎵 Preparing to create/update Spotify playlist: {playlist_name}")
     try:
-        playlist_id = spotify.create_playlist(playlist_name)
-        if not playlist_id:
-            log.error(f"❌ Failed to create playlist: {playlist_name}")
-            return None
-        unique_uris = list(dict.fromkeys(found_uris))
-        duplicates_count = len(found_uris) - len(unique_uris)
-        log.debug(f"🔍 Removing duplicates: {duplicates_count} duplicates removed.")
-        spotify.add_tracks_to_specific_playlist(playlist_id, unique_uris)
-        log.debug(
-            f"✅ Created playlist {playlist_name} with ID {playlist_id} containing {len(unique_uris)} tracks."
-        )
-        return playlist_id
+        # Check for existing playlist
+        existing_playlist = spotify.find_playlist_by_name(playlist_name)
+        if existing_playlist:
+            playlist_id = existing_playlist["id"]
+            log.info(
+                f"📝 Playlist '{playlist_name}' already exists, updating existing playlist (ID: {playlist_id})."
+            )
+            # Get existing track URIs
+            existing_uris = set(spotify.get_playlist_tracks(playlist_id))
+            # Remove duplicates in found_uris and filter out those already in playlist
+            unique_uris = []
+            seen = set()
+            for uri in found_uris:
+                if uri not in seen and uri not in existing_uris:
+                    unique_uris.append(uri)
+                    seen.add(uri)
+            duplicates_count = len(found_uris) - len(unique_uris)
+            already_in_playlist_count = len(found_uris) - len(
+                [uri for uri in found_uris if uri not in existing_uris]
+            )
+            log.debug(
+                f"🔍 Removing duplicates: {duplicates_count} duplicates removed. {already_in_playlist_count} tracks already in playlist, not adding again."
+            )
+            if unique_uris:
+                spotify.add_tracks_to_specific_playlist(playlist_id, unique_uris)
+                log.debug(
+                    f"✅ Added {len(unique_uris)} new tracks to existing playlist {playlist_name} (ID: {playlist_id})."
+                )
+            else:
+                log.debug(
+                    f"ℹ️ No new tracks to add to existing playlist {playlist_name}."
+                )
+            return playlist_id
+        else:
+            # Create new playlist as before
+            playlist_id = spotify.create_playlist(playlist_name)
+            if not playlist_id:
+                log.error(f"❌ Failed to create playlist: {playlist_name}")
+                return None
+            unique_uris = list(dict.fromkeys(found_uris))
+            duplicates_count = len(found_uris) - len(unique_uris)
+            log.debug(f"🔍 Removing duplicates: {duplicates_count} duplicates removed.")
+            spotify.add_tracks_to_specific_playlist(playlist_id, unique_uris)
+            log.debug(
+                f"✅ Created playlist {playlist_name} with ID {playlist_id} containing {len(unique_uris)} tracks."
+            )
+            return playlist_id
     except Exception as e:
-        log.error(f"❌ Exception while creating Spotify playlist {playlist_name}: {e}")
+        log.error(
+            f"❌ Exception while creating/updating Spotify playlist {playlist_name}: {e}"
+        )
         return None
 
 
@@ -246,7 +283,7 @@ def process_file(file, processed_map, sheet_service, spreadsheet_id, drive_servi
         else:
             unfound.append((artist, title, extvdj_line))
 
-    update_spotify(found_uris)
+    update_spotify_radio_playlist(found_uris)
 
     playlist_id = create_spotify_playlist_for_file(date, found_uris)
     if playlist_id:
