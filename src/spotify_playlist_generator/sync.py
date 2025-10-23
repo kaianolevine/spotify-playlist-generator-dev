@@ -8,6 +8,7 @@ import kaiano_common_utils.config as config
 import kaiano_common_utils.google_drive as drive
 import kaiano_common_utils.google_sheets as sheets
 import kaiano_common_utils.m3u_parsing as m3u
+from dotenv import load_dotenv
 from googleapiclient.errors import HttpError
 from kaiano_common_utils import logger as log
 from kaiano_common_utils import spotify
@@ -207,15 +208,6 @@ def log_to_sheets(
     else:
         log.debug("🧪 No rows to write to Songs Added.")
 
-    # Log unfound tracks info messages
-    for artist, title, _ in unfound:
-        log.debug(f"🧪 Artist: {artist}, Title: {title}")
-        log_info_sheet(
-            sheet_service,
-            spreadsheet_id,
-            f"❌ Would log unfound track: {date} - {artist} - {title}",
-        )
-
     # Log unfound songs to "Songs Not Found"
     unfound_rows = [[date, title, artist] for artist, title, _ in unfound]
     if unfound_rows:
@@ -316,6 +308,8 @@ def process_file(file, processed_map, sheet_service, spreadsheet_id, drive_servi
 
 
 def main():
+    load_dotenv()  # load environment variables
+
     sheet_service = sheets.get_sheets_service()
     spreadsheet_id = config.HISTORY_TO_SPOTIFY_LOGGING
     log_start(sheet_service, spreadsheet_id)
