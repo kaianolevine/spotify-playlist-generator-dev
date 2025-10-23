@@ -2,6 +2,7 @@
 sync.py — Main integration script for Westie Radio automation.
 """
 
+import os
 from datetime import datetime
 
 import kaiano_common_utils.config as config
@@ -260,51 +261,58 @@ def process_file(file, processed_map, sheet_service, spreadsheet_id, drive_servi
     date = drive.extract_date_from_filename(filename)
     log_info_sheet(sheet_service, spreadsheet_id, f"🎶 Processing file: {filename}")
 
-    drive.download_file(drive_service, file_id, filename)
-    songs = m3u.parse_m3u(sheet_service, filename, spreadsheet_id)
+    try:
+        drive.download_file(drive_service, file_id, filename)
+        songs = m3u.parse_m3u(sheet_service, filename, spreadsheet_id)
 
-    last_extvdj_line = processed_map.get(filename)
-    new_songs = process_new_songs(songs, last_extvdj_line)
-    if not new_songs:
-        return
+        last_extvdj_line = processed_map.get(filename)
+        new_songs = process_new_songs(songs, last_extvdj_line)
+        if not new_songs:
+            return
 
-    # --- Spotify: search and collect URIs ---
-    found_uris = []
-    matched_songs = []
-    matched_extvdj_lines = []
-    unfound = []
-    for artist, title, extvdj_line in new_songs:
-        uri = spotify.search_track(artist, title)
-        log.debug(
-            f"Searching for track - Artist: {artist}, Title: {title}, Found URI: {uri}"
-        )
-        if uri:
-            found_uris.append(uri)
-            matched_songs.append((artist, title))
-            matched_extvdj_lines.append(extvdj_line)
+        # --- Spotify: search and collect URIs ---
+        found_uris = []
+        matched_songs = []
+        matched_extvdj_lines = []
+        unfound = []
+        for artist, title, extvdj_line in new_songs:
+            uri = spotify.search_track(artist, title)
+            log.debug(
+                f"Searching for track - Artist: {artist}, Title: {title}, Found URI: {uri}"
+            )
+            if uri:
+                found_uris.append(uri)
+                matched_songs.append((artist, title))
+                matched_extvdj_lines.append(extvdj_line)
+            else:
+                unfound.append((artist, title, extvdj_line))
+
+        update_spotify_radio_playlist(found_uris)
+
+        playlist_id = create_spotify_playlist_for_file(date, found_uris)
+        if playlist_id:
+            log.info(f"✅ Playlist created successfully with ID: {playlist_id}")
         else:
-            unfound.append((artist, title, extvdj_line))
+            log.error(f"❌ Playlist creation failed for date: {date}")
 
-    update_spotify_radio_playlist(found_uris)
-
-    playlist_id = create_spotify_playlist_for_file(date, found_uris)
-    if playlist_id:
-        log.info(f"✅ Playlist created successfully with ID: {playlist_id}")
-    else:
-        log.error(f"❌ Playlist creation failed for date: {date}")
-
-    log_to_sheets(
-        sheet_service,
-        spreadsheet_id,
-        date,
-        matched_songs,
-        found_uris,
-        unfound,
-        filename,
-        new_songs,
-        last_extvdj_line,
-        playlist_id=playlist_id,
-    )
+        log_to_sheets(
+            sheet_service,
+            spreadsheet_id,
+            date,
+            matched_songs,
+            found_uris,
+            unfound,
+            filename,
+            new_songs,
+            last_extvdj_line,
+            playlist_id=playlist_id,
+        )
+    finally:
+        try:
+            os.remove(filename)
+            log.debug(f"🧹 Deleted temporary file: {filename}")
+        except Exception as e:
+            log.warning(f"⚠️ Could not delete file {filename}: {e}")
 
 
 def main():
