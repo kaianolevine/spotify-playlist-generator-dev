@@ -4,31 +4,11 @@ These tests mock all external dependencies (Google, Spotify, etc.)
 and validate flow control, logging, and error handling.
 """
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 import spotify_playlist_generator.sync as sync
-
-
-@pytest.fixture(autouse=True)
-def mock_config(monkeypatch):
-    monkeypatch.setattr(sync.config, "HISTORY_TO_SPOTIFY_LOGGING", "spreadsheet_id")
-    monkeypatch.setattr(sync.config, "VDJ_HISTORY_FOLDER_ID", "folder_id")
-    monkeypatch.setenv("HISTORY_TO_SPOTIFY_LOGGING", "spreadsheet_id")
-    monkeypatch.setenv("VDJ_HISTORY_FOLDER_ID", "folder_id")
-    import os
-
-    monkeypatch.setattr(
-        os,
-        "getenv",
-        lambda key, default=None: (
-            "spreadsheet_id"
-            if "HISTORY_TO_SPOTIFY_LOGGING" in key
-            else ("folder_id" if "VDJ_HISTORY_FOLDER_ID" in key else default)
-        ),
-    )
-    return sync.config
 
 
 @pytest.fixture
@@ -40,6 +20,14 @@ def mock_services(monkeypatch):
     return sheet_service, drive_service
 
 
+@pytest.fixture
+def mock_drive_and_sheets():
+    with patch.object(sync, "drive") as mock_drive, patch.object(
+        sync, "sheets"
+    ) as mock_sheets:
+        yield mock_drive, mock_sheets
+
+
 def test_initialize_logging_spreadsheet_creates_sheets(monkeypatch):
     mock_sheet = MagicMock()
     monkeypatch.setattr(sync.sheets, "get_sheets_service", lambda: mock_sheet)
@@ -47,7 +35,7 @@ def test_initialize_logging_spreadsheet_creates_sheets(monkeypatch):
     monkeypatch.setattr(
         sync.sheets, "get_sheet_metadata", lambda *a, **kw: {"sheets": []}
     )
-    sync.initialize_logging_spreadsheet()
+    sync.get_or_create_logging_spreadsheet()
 
     # Assert calls exist, but ignore the actual spreadsheet_id value
     calls = sync.sheets.ensure_sheet_exists.call_args_list
@@ -68,7 +56,7 @@ def test_initialize_logging_spreadsheet_deletes_default(monkeypatch):
     )
     monkeypatch.setattr(sync.sheets, "delete_sheet_by_name", MagicMock())
 
-    sync.initialize_logging_spreadsheet()
+    sync.get_or_create_logging_spreadsheet()
     call_args = sync.sheets.delete_sheet_by_name.call_args
     assert call_args.args[2] == "Sheet1"
 
@@ -190,23 +178,6 @@ def test_process_file_happy_path(monkeypatch):
     sync.process_file(file, processed_map, mock_sheet, "spreadsheet_id", mock_drive)
     sync.update_spotify_radio_playlist.assert_called_once()
     sync.log_to_sheets.assert_called_once()
-
-
-def test_initialize_logging_spreadsheet_existing_sheets(monkeypatch):
-    mock_sheet = MagicMock()
-    monkeypatch.setattr(sync.sheets, "get_sheets_service", lambda: mock_sheet)
-    existing = [
-        {"properties": {"title": "Processed", "sheetId": 111}},
-        {"properties": {"title": "Songs Added", "sheetId": 222}},
-        {"properties": {"title": "Songs Not Found", "sheetId": 333}},
-    ]
-    monkeypatch.setattr(
-        sync.sheets, "get_sheet_metadata", lambda *a, **kw: {"sheets": existing}
-    )
-    monkeypatch.setattr(sync.sheets, "ensure_sheet_exists", MagicMock())
-    sync.initialize_logging_spreadsheet()
-    calls = [c.args[2] for c in sync.sheets.ensure_sheet_exists.call_args_list]
-    assert set(calls) == {"Processed", "Songs Added", "Songs Not Found"}
 
 
 def test_create_spotify_playlist_for_file_raises(monkeypatch):

@@ -5,7 +5,6 @@ sync.py — Main integration script for Westie Radio automation.
 import os
 from datetime import datetime
 
-import kaiano_common_utils.config as config
 import kaiano_common_utils.google_drive as drive
 import kaiano_common_utils.google_sheets as sheets
 import kaiano_common_utils.m3u_parsing as m3u
@@ -14,46 +13,69 @@ from googleapiclient.errors import HttpError
 from kaiano_common_utils import logger as log
 from kaiano_common_utils import spotify
 
+import spotify_playlist_generator.config as config
+
 log = log.get_logger()
 
-spreadsheet_id = config.HISTORY_TO_SPOTIFY_LOGGING
+
+# --- Logging spreadsheet management ---
+def get_or_create_logging_spreadsheet():
+    """
+    Locate the logging spreadsheet by name in the configured folder, or create it if missing.
+    Ensures the required sheets exist.
+    """
+    folder_id = config.HISTORY_TO_SPOTIFY_FOLDER_ID
+    spreadsheet_name = config.HISTORY_TO_SPOTIFY_SPREADSHEET_NAME
+    drive_service = drive.get_drive_service()
+
+    # Search for a Google Sheet with the given name in the folder
+    files = drive.list_files_in_folder(drive_service, folder_id)
+    for f in files:
+        if f["name"] == spreadsheet_name and f.get("mimeType", "").startswith(
+            "application/vnd.google-apps.spreadsheet"
+        ):
+            spreadsheet_id = f["id"]
+            setup_logging_spreadsheet(spreadsheet_id)
+            return spreadsheet_id
+
+    # Not found: create new spreadsheet, move to folder
+    spreadsheet_id = drive.create_spreadsheet(
+        drive_service, spreadsheet_name, folder_id
+    )
+    setup_logging_spreadsheet(spreadsheet_id)
+    # drive.move_file_to_folder(drive_service, spreadsheet_id, folder_id)
+    log.info(
+        f"Created new logging spreadsheet '{spreadsheet_name}' in folder {folder_id}."
+    )
+    return spreadsheet_id
 
 
-def initialize_logging_spreadsheet():
-    """Ensure necessary sheets exist and remove default 'Sheet1' if present."""
+def setup_logging_spreadsheet(spreadsheet_id):
+    """
+    Ensure the logging spreadsheet contains only the required sheets with correct headers.
+    """
+    required_sheets = {
+        "Info": ["Message"],
+        "Processed": ["Filename", "Date", "ExtVDJLine"],
+        "Songs Added": ["Date", "Title", "Artist"],
+        "Songs Not Found": ["Date", "Title", "Artist"],
+    }
     sheet_service = sheets.get_sheets_service()
-
-    # Ensure necessary sheets
-    sheets.ensure_sheet_exists(
-        sheet_service,
-        spreadsheet_id,
-        "Processed",
-        headers=["Filename", "Date", "ExtVDJLine"],
-    )
-    sheets.ensure_sheet_exists(
-        sheet_service,
-        spreadsheet_id,
-        "Songs Added",
-        headers=["Date", "Title", "Artist"],
-    )
-    sheets.ensure_sheet_exists(
-        sheet_service,
-        spreadsheet_id,
-        "Songs Not Found",
-        headers=["Date", "Title", "Artist"],
-    )
-
-    # Attempt to delete 'Sheet1' if it exists
+    # Create/ensure each required sheet with headers
+    for sheet_name, headers in required_sheets.items():
+        sheets.ensure_sheet_exists(
+            sheet_service, spreadsheet_id, sheet_name, headers=headers
+        )
+    # Remove any other sheets
     try:
         metadata = sheets.get_sheet_metadata(sheet_service, spreadsheet_id)
         for sheet_info in metadata.get("sheets", []):
             title = sheet_info.get("properties", {}).get("title", "")
-            sheet_id = sheet_info.get("properties", {}).get("sheetId", None)
-            if title == "Sheet1" and sheet_id is not None:
-                sheets.delete_sheet_by_name(sheet_service, spreadsheet_id, "Sheet1")
-                log.info("🗑 Deleted default 'Sheet1'.")
+            if title not in required_sheets:
+                sheets.delete_sheet_by_name(sheet_service, spreadsheet_id, title)
+                log.info(f"🗑 Deleted extraneous sheet '{title}'.")
     except HttpError as e:
-        log.error(f"⚠️ Failed to delete 'Sheet1': {e}")
+        log.error(f"⚠️ Failed to clean up sheets: {e}")
 
 
 def log_info_sheet(service, spreadsheet_id: str, message: str):
@@ -319,10 +341,8 @@ def main():
     load_dotenv()  # load environment variables
 
     sheet_service = sheets.get_sheets_service()
-    spreadsheet_id = config.HISTORY_TO_SPOTIFY_LOGGING
+    spreadsheet_id = get_or_create_logging_spreadsheet()
     log_start(sheet_service, spreadsheet_id)
-
-    initialize_logging_spreadsheet()
 
     folder_id = config.VDJ_HISTORY_FOLDER_ID
     if not folder_id:

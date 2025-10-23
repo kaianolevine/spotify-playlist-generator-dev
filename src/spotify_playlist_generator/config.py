@@ -1,0 +1,25 @@
+import os
+
+from dotenv import load_dotenv
+
+# Load from .env if it exists (useful for local development)
+load_dotenv()
+
+LOGGING_LEVEL = os.getenv("LOGGING_LEVEL", "").upper()
+
+VDJ_HISTORY_FOLDER_ID = "1FzuuO3xmL2n-8pZ_B-FyrvGWaLxLED3o"  # VDJ/History
+
+# Spotify configuration
+SPOTIPY_CLIENT_ID = os.getenv("SPOTIPY_CLIENT_ID")
+SPOTIPY_CLIENT_SECRET = os.getenv("SPOTIPY_CLIENT_SECRET")
+SPOTIPY_REFRESH_TOKEN = os.getenv("SPOTIPY_REFRESH_TOKEN")
+SPOTIPY_REDIRECT_URI = "http://127.0.0.1:8888/callback"
+SPOTIFY_CLIENT_ID = SPOTIPY_CLIENT_ID
+SPOTIFY_CLIENT_SECRET = SPOTIPY_CLIENT_SECRET
+SPOTIFY_REFRESH_TOKEN = SPOTIPY_REFRESH_TOKEN
+SPOTIFY_REDIRECT_URI = SPOTIPY_REDIRECT_URI
+SPOTIFY_USERNAME = "31oya3ie2f5wwlqt6tnfurou6zzq"  # Deejey Marvel Automations
+SPOTIFY_PLAYLIST_ID = "5UgPYNOMpFXzuqzDJeervs"  # TestPlaylist
+
+HISTORY_TO_SPOTIFY_FOLDER_ID = "15U-VPMLszK6q66pwIp5OcQpHGTBW6vLs"
+HISTORY_TO_SPOTIFY_SPREADSHEET_NAME = "DJM Radio Logging"
