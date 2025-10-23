@@ -43,7 +43,6 @@ def get_or_create_logging_spreadsheet():
         drive_service, spreadsheet_name, folder_id
     )
     setup_logging_spreadsheet(spreadsheet_id)
-    # drive.move_file_to_folder(drive_service, spreadsheet_id, folder_id)
     log.info(
         f"Created new logging spreadsheet '{spreadsheet_name}' in folder {folder_id}."
     )
