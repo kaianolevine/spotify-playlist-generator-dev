@@ -39,3 +39,8 @@ venv.bak/
 
 # macOS
 .DS_Store
+
+# Other files
+*.m3u
+.cach*
+credential*
