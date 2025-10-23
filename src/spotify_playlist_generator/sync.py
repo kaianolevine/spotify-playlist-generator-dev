@@ -265,11 +265,13 @@ def process_file(file, processed_map, sheet_service, spreadsheet_id, drive_servi
         drive.download_file(drive_service, file_id, filename)
         songs = m3u.parse_m3u(sheet_service, filename, spreadsheet_id)
 
+        log.error("------------------------------------Block 1")
         last_extvdj_line = processed_map.get(filename)
         new_songs = process_new_songs(songs, last_extvdj_line)
         if not new_songs:
             return
 
+        log.error("------------------------------------Block 2")
         # --- Spotify: search and collect URIs ---
         found_uris = []
         matched_songs = []
@@ -287,6 +289,7 @@ def process_file(file, processed_map, sheet_service, spreadsheet_id, drive_servi
             else:
                 unfound.append((artist, title, extvdj_line))
 
+        log.error("------------------------------------Block 3")
         update_spotify_radio_playlist(found_uris)
 
         playlist_id = create_spotify_playlist_for_file(date, found_uris)
