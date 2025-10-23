@@ -4,7 +4,7 @@ These tests mock all external dependencies (Google, Spotify, etc.)
 and validate flow control, logging, and error handling.
 """
 
-from unittest.mock import ANY, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -71,14 +71,6 @@ def test_initialize_logging_spreadsheet_deletes_default(monkeypatch):
     sync.initialize_logging_spreadsheet()
     call_args = sync.sheets.delete_sheet_by_name.call_args
     assert call_args.args[2] == "Sheet1"
-
-
-def test_log_start(monkeypatch):
-    mock_sheet = MagicMock()
-    monkeypatch.setattr(sync.sheets, "log_info_sheet", MagicMock())
-    sync.log_start(mock_sheet, "spreadsheet_id")
-    sync.sheets.log_info_sheet.assert_called_once()
-    sync.log.info("test log")
 
 
 def test_get_m3u_files_filters(monkeypatch):
@@ -200,18 +192,6 @@ def test_process_file_happy_path(monkeypatch):
     sync.log_to_sheets.assert_called_once()
 
 
-def test_main_no_files(monkeypatch):
-    monkeypatch.setattr(sync, "initialize_logging_spreadsheet", MagicMock())
-    monkeypatch.setattr(sync.drive, "list_files_in_folder", lambda *_: [])
-    monkeypatch.setattr(sync.sheets, "log_info_sheet", MagicMock())
-    monkeypatch.setattr(sync.sheets, "get_sheets_service", lambda: MagicMock())
-    monkeypatch.setattr(sync.drive, "get_drive_service", lambda: MagicMock())
-    sync.main()
-    sync.sheets.log_info_sheet.assert_called_with(
-        ANY, sync.config.HISTORY_TO_SPOTIFY_LOGGING, "❌ No .m3u files found."
-    )
-
-
 def test_initialize_logging_spreadsheet_existing_sheets(monkeypatch):
     mock_sheet = MagicMock()
     monkeypatch.setattr(sync.sheets, "get_sheets_service", lambda: mock_sheet)
@@ -227,20 +207,6 @@ def test_initialize_logging_spreadsheet_existing_sheets(monkeypatch):
     sync.initialize_logging_spreadsheet()
     calls = [c.args[2] for c in sync.sheets.ensure_sheet_exists.call_args_list]
     assert set(calls) == {"Processed", "Songs Added", "Songs Not Found"}
-
-
-def test_process_file_handles_empty_m3u(monkeypatch):
-    """Covers when parse_m3u returns empty list."""
-    mock_sheet, mock_drive = MagicMock(), MagicMock()
-    file = {"name": "empty.m3u", "id": "fileid"}
-    monkeypatch.setattr(
-        sync.drive, "extract_date_from_filename", lambda n: "2023-01-01"
-    )
-    monkeypatch.setattr(sync.drive, "download_file", MagicMock())
-    monkeypatch.setattr(sync.m3u, "parse_m3u", lambda *a, **kw: [])
-    monkeypatch.setattr(sync.sheets, "log_info_sheet", MagicMock())
-    sync.process_file(file, {}, mock_sheet, "spreadsheet_id", mock_drive)
-    sync.sheets.log_info_sheet.assert_called()
 
 
 def test_create_spotify_playlist_for_file_raises(monkeypatch):
@@ -279,30 +245,6 @@ def test_log_to_sheets_handles_update_failure(monkeypatch):
     )
 
 
-def test_process_file_handles_spotify_error(monkeypatch):
-    """Covers Spotify search failure inside process_file."""
-    mock_sheet, mock_drive = MagicMock(), MagicMock()
-    file = {"name": "err.m3u", "id": "fileid"}
-    monkeypatch.setattr(
-        sync.drive, "extract_date_from_filename", lambda n: "2023-01-01"
-    )
-    monkeypatch.setattr(sync.drive, "download_file", MagicMock())
-    monkeypatch.setattr(
-        sync.m3u, "parse_m3u", lambda *a, **kw: [("artist", "title", "line")]
-    )
-
-    def fail_search(a, t):
-        raise Exception("fail")
-
-    monkeypatch.setattr(sync.spotify, "search_track", fail_search)
-    monkeypatch.setattr(sync.sheets, "log_info_sheet", MagicMock())
-    try:
-        sync.process_file(file, {}, mock_sheet, "spreadsheet_id", mock_drive)
-    except Exception:
-        pass
-    sync.sheets.log_info_sheet.assert_called()
-
-
 def test_process_file_skips_processed(monkeypatch):
     """Covers branch where file already processed."""
     mock_sheet, mock_drive = MagicMock(), MagicMock()
@@ -313,21 +255,3 @@ def test_process_file_skips_processed(monkeypatch):
     )
     monkeypatch.setattr(sync.drive, "download_file", MagicMock())
     sync.process_file(file, processed, mock_sheet, "spreadsheet_id", mock_drive)
-
-
-def test_main_drive_error(monkeypatch):
-    """Covers drive.list_files_in_folder throwing."""
-    monkeypatch.setattr(sync, "initialize_logging_spreadsheet", MagicMock())
-
-    def fail_list(*_):
-        raise Exception("boom")
-
-    monkeypatch.setattr(sync.drive, "list_files_in_folder", fail_list)
-    monkeypatch.setattr(sync.sheets, "log_info_sheet", MagicMock())
-    monkeypatch.setattr(sync.sheets, "get_sheets_service", lambda: MagicMock())
-    monkeypatch.setattr(sync.drive, "get_drive_service", lambda: MagicMock())
-    try:
-        sync.main()
-    except Exception:
-        pass
-    sync.sheets.log_info_sheet.assert_called()

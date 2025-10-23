@@ -54,8 +54,16 @@ def initialize_logging_spreadsheet():
         log.error(f"⚠️ Failed to delete 'Sheet1': {e}")
 
 
+def log_info_sheet(service, spreadsheet_id: str, message: str):
+    log.info(
+        f"Logging message to Info sheet in spreadsheet_id={spreadsheet_id}: {message}"
+    )
+    sheets.get_or_create_sheet(service, spreadsheet_id, "Info")
+    sheets.append_rows(service, spreadsheet_id, "Info!A1", [[message]])
+
+
 def log_start(sheet_service, spreadsheet_id):
-    sheets.log_info_sheet(
+    log_info_sheet(
         sheet_service,
         spreadsheet_id,
         f"🔄 Starting Westie Radio sync at {datetime.now().replace(microsecond=0).isoformat()}...",
@@ -175,7 +183,7 @@ def log_to_sheets(
     last_extvdj_line,
     playlist_id=None,
 ):
-    sheets.log_info_sheet(
+    log_info_sheet(
         sheet_service,
         spreadsheet_id,
         f"✅ Found {len(found_uris)} tracks, ❌ {len(unfound)} unfound",
@@ -202,7 +210,7 @@ def log_to_sheets(
     # Log unfound tracks info messages
     for artist, title, _ in unfound:
         log.debug(f"🧪 Artist: {artist}, Title: {title}")
-        sheets.log_info_sheet(
+        log_info_sheet(
             sheet_service,
             spreadsheet_id,
             f"❌ Would log unfound track: {date} - {artist} - {title}",
@@ -258,9 +266,7 @@ def process_file(file, processed_map, sheet_service, spreadsheet_id, drive_servi
     filename = file["name"]
     file_id = file["id"]
     date = drive.extract_date_from_filename(filename)
-    sheets.log_info_sheet(
-        sheet_service, spreadsheet_id, f"🎶 Processing file: {filename}"
-    )
+    log_info_sheet(sheet_service, spreadsheet_id, f"🎶 Processing file: {filename}")
 
     drive.download_file(drive_service, file_id, filename)
     songs = m3u.parse_m3u(sheet_service, filename, spreadsheet_id)
@@ -326,7 +332,7 @@ def main():
     m3u_files = get_m3u_files(drive_service, folder_id)
 
     if not m3u_files:
-        sheets.log_info_sheet(sheet_service, spreadsheet_id, "❌ No .m3u files found.")
+        log_info_sheet(sheet_service, spreadsheet_id, "❌ No .m3u files found.")
         return
 
     processed_map = load_processed_map(sheet_service, spreadsheet_id)
@@ -334,7 +340,7 @@ def main():
     for file in m3u_files:
         process_file(file, processed_map, sheet_service, spreadsheet_id, drive_service)
 
-    sheets.log_info_sheet(sheet_service, spreadsheet_id, "✅ Sync complete.")
+    log_info_sheet(sheet_service, spreadsheet_id, "✅ Sync complete.")
     log.info("✅ Sync complete.")
 
 
