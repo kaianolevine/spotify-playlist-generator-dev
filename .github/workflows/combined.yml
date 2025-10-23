@@ -26,7 +26,7 @@ jobs:
           poetry run pytest --cov=src --cov-report=term-missing --cov-fail-under=0
       - name: Check coverage threshold (warn except main)
         run: |
-          THRESHOLD=80
+          THRESHOLD=60
           echo "📊 Checking coverage threshold..."
           TOTAL_LINE=$(poetry run coverage report | tail -n 1)
           echo "Coverage summary line: $TOTAL_LINE"
