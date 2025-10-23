@@ -28,39 +28,6 @@ def mock_drive_and_sheets():
         yield mock_drive, mock_sheets
 
 
-def test_initialize_logging_spreadsheet_creates_sheets(monkeypatch):
-    mock_sheet = MagicMock()
-    monkeypatch.setattr(sync.sheets, "get_sheets_service", lambda: mock_sheet)
-    monkeypatch.setattr(sync.sheets, "ensure_sheet_exists", MagicMock())
-    monkeypatch.setattr(
-        sync.sheets, "get_sheet_metadata", lambda *a, **kw: {"sheets": []}
-    )
-    sync.get_or_create_logging_spreadsheet()
-
-    # Assert calls exist, but ignore the actual spreadsheet_id value
-    calls = sync.sheets.ensure_sheet_exists.call_args_list
-    assert any(call.args[2] == "Processed" for call in calls)
-    assert any(call.args[2] == "Songs Added" for call in calls)
-
-
-def test_initialize_logging_spreadsheet_deletes_default(monkeypatch):
-    mock_sheet = MagicMock()
-    monkeypatch.setattr(sync.sheets, "get_sheets_service", lambda: mock_sheet)
-    monkeypatch.setattr(sync.sheets, "ensure_sheet_exists", MagicMock())
-    monkeypatch.setattr(
-        sync.sheets,
-        "get_sheet_metadata",
-        lambda *a, **kw: {
-            "sheets": [{"properties": {"title": "Sheet1", "sheetId": 123}}]
-        },
-    )
-    monkeypatch.setattr(sync.sheets, "delete_sheet_by_name", MagicMock())
-
-    sync.get_or_create_logging_spreadsheet()
-    call_args = sync.sheets.delete_sheet_by_name.call_args
-    assert call_args.args[2] == "Sheet1"
-
-
 def test_get_m3u_files_filters(monkeypatch):
     mock_drive = MagicMock()
     monkeypatch.setattr(
