@@ -8,6 +8,7 @@ from datetime import datetime
 import kaiano_common_utils.google_drive as drive
 import kaiano_common_utils.google_sheets as sheets
 import kaiano_common_utils.m3u_parsing as m3u
+import kaiano_common_utils.sheets_formatting as formatting
 from dotenv import load_dotenv
 from googleapiclient.errors import HttpError
 from kaiano_common_utils import logger as log
@@ -54,8 +55,8 @@ def setup_logging_spreadsheet(spreadsheet_id):
     Ensure the logging spreadsheet contains only the required sheets with correct headers.
     """
     required_sheets = {
-        "Info": ["Message"],
-        "Processed": ["Filename", "Date", "ExtVDJLine"],
+        "Info": ["Timestamp", "Message", "Processed", "Found", "Unfound"],
+        "Processed": ["Filename", "Playlist ID", "ExtVDJLine"],
         "Songs Added": ["Date", "Title", "Artist"],
         "Songs Not Found": ["Date", "Title", "Artist"],
     }
@@ -77,19 +78,46 @@ def setup_logging_spreadsheet(spreadsheet_id):
         log.error(f"⚠️ Failed to clean up sheets: {e}")
 
 
-def log_info_sheet(service, spreadsheet_id: str, message: str):
-    log.info(
-        f"Logging message to Info sheet in spreadsheet_id={spreadsheet_id}: {message}"
+def log_info_sheet(
+    service,
+    spreadsheet_id: str,
+    message: str = None,
+    processed: str = None,
+    found: str = None,
+    unfound: str = None,
+):
+
+    timestamp = datetime.now().replace(microsecond=0).isoformat(sep=" ")
+
+    # Ensure Info sheet exists with correct headers
+    sheets.ensure_sheet_exists(
+        service,
+        spreadsheet_id,
+        "Info",
+        headers=["Timestamp", "Message", "Processed", "Found", "Unfound"],
     )
-    sheets.get_or_create_sheet(service, spreadsheet_id, "Info")
-    sheets.append_rows(service, spreadsheet_id, "Info!A1", [[message]])
+
+    # Determine which type of row to append
+    if all(v is not None for v in [message, processed, found, unfound]):
+        row = [[timestamp, message, processed, found, unfound]]
+    elif message:
+        row = [[timestamp, message, "", "", ""]]
+    else:
+        log.warning("⚠️ No message or data provided to log_info_sheet.")
+        return
+
+    try:
+        sheets.append_rows(service, spreadsheet_id, "Info!A1", row)
+        log.info(f"🧾 Logged Info row: {row}")
+    except Exception as e:
+        log.error(f"⚠️ Failed to append Info row: {e}")
 
 
 def log_start(sheet_service, spreadsheet_id):
     log_info_sheet(
         sheet_service,
         spreadsheet_id,
-        f"🔄 Starting Westie Radio sync at {datetime.now().replace(microsecond=0).isoformat()}...",
+        "🔄 Starting Radio Sync...",
     )
     log.info("Starting debug logging for Westie Radio sync.")
 
@@ -124,9 +152,9 @@ def process_new_songs(songs, last_extvdj_line):
     return new_songs
 
 
-def update_spotify_radio_playlist(found_uris):
+def update_spotify_radio_playlist(playlist_id, found_uris):
     try:
-        spotify.add_tracks_to_playlist(found_uris)
+        spotify.add_tracks_to_specific_playlist(playlist_id, found_uris)
         spotify.trim_playlist_to_limit()
     except Exception as e:
         log.error(f"Error updating Spotify playlist: {e}")
@@ -147,26 +175,11 @@ def create_spotify_playlist_for_file(date_str: str, found_uris: list[str]) -> st
             log.info(
                 f"📝 Playlist '{playlist_name}' already exists, updating existing playlist (ID: {playlist_id})."
             )
-            # Get existing track URIs
-            existing_uris = set(spotify.get_playlist_tracks(playlist_id))
-            # Remove duplicates in found_uris and filter out those already in playlist
-            unique_uris = []
-            seen = set()
-            for uri in found_uris:
-                if uri not in seen and uri not in existing_uris:
-                    unique_uris.append(uri)
-                    seen.add(uri)
-            duplicates_count = len(found_uris) - len(unique_uris)
-            already_in_playlist_count = len(found_uris) - len(
-                [uri for uri in found_uris if uri not in existing_uris]
-            )
-            log.debug(
-                f"🔍 Removing duplicates: {duplicates_count} duplicates removed. {already_in_playlist_count} tracks already in playlist, not adding again."
-            )
-            if unique_uris:
-                spotify.add_tracks_to_specific_playlist(playlist_id, unique_uris)
+
+            if found_uris:
+                spotify.add_tracks_to_specific_playlist(playlist_id, found_uris)
                 log.debug(
-                    f"✅ Added {len(unique_uris)} new tracks to existing playlist {playlist_name} (ID: {playlist_id})."
+                    f"✅ Added {len(found_uris)} (not necessarily) new tracks to existing playlist {playlist_name} (ID: {playlist_id})."
                 )
             else:
                 log.debug(
@@ -194,6 +207,9 @@ def create_spotify_playlist_for_file(date_str: str, found_uris: list[str]) -> st
         return None
 
 
+whitespace_buffer = ""
+
+
 def log_to_sheets(
     sheet_service,
     spreadsheet_id,
@@ -209,7 +225,10 @@ def log_to_sheets(
     log_info_sheet(
         sheet_service,
         spreadsheet_id,
-        f"✅ Found {len(found_uris)} tracks, ❌ {len(unfound)} unfound",
+        f"🎶 Processed file: {filename}{whitespace_buffer}",
+        f"Processed rows: {len(new_songs)}{whitespace_buffer}",
+        f"✅ Found tracks: {len(found_uris)}{whitespace_buffer}",
+        f"❌ Unfound tracks: {len(unfound)}{whitespace_buffer}",
     )
 
     # Log Songs Added
@@ -244,10 +263,10 @@ def log_to_sheets(
     # Log processing summary to "Processed" tab
     last_logged_extvdj_line = new_songs[-1][2] if new_songs else last_extvdj_line
     if playlist_id:
-        updated_row = [filename, date, last_logged_extvdj_line, playlist_id]
+        updated_row = [filename, playlist_id, last_logged_extvdj_line]
         log.debug(f"Logging playlist ID in Processed sheet: {playlist_id}")
     else:
-        updated_row = [filename, date, last_logged_extvdj_line]
+        updated_row = [filename, last_logged_extvdj_line]
     try:
         log.debug(f"Updating Processed log: {updated_row}")
         log.debug(f"Last logged ExtVDJ line: {last_logged_extvdj_line}")
@@ -280,7 +299,6 @@ def process_file(file, processed_map, sheet_service, spreadsheet_id, drive_servi
     filename = file["name"]
     file_id = file["id"]
     date = drive.extract_date_from_filename(filename)
-    log_info_sheet(sheet_service, spreadsheet_id, f"🎶 Processing file: {filename}")
 
     try:
         drive.download_file(drive_service, file_id, filename)
@@ -289,6 +307,12 @@ def process_file(file, processed_map, sheet_service, spreadsheet_id, drive_servi
         last_extvdj_line = processed_map.get(filename)
         new_songs = process_new_songs(songs, last_extvdj_line)
         if not new_songs:
+            log.debug(
+                f"🎶 Processed file: {filename}, "
+                f"Processed rows: {0}, "
+                f"✅ Found tracks: {0}, "
+                f"❌ Unfound tracks: {0}"
+            )
             return
 
         # --- Spotify: search and collect URIs ---
@@ -308,7 +332,7 @@ def process_file(file, processed_map, sheet_service, spreadsheet_id, drive_servi
             else:
                 unfound.append((artist, title, extvdj_line))
 
-        update_spotify_radio_playlist(found_uris)
+        update_spotify_radio_playlist(config.SPOTIFY_PLAYLIST_ID, found_uris)
 
         playlist_id = create_spotify_playlist_for_file(date, found_uris)
         if playlist_id:
@@ -361,6 +385,7 @@ def main():
     for file in m3u_files:
         process_file(file, processed_map, sheet_service, spreadsheet_id, drive_service)
 
+    formatting.apply_formatting_to_sheet(spreadsheet_id)
     log_info_sheet(sheet_service, spreadsheet_id, "✅ Sync complete.")
     log.info("✅ Sync complete.")
 
