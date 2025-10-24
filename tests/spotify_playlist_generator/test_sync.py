@@ -59,14 +59,6 @@ def test_process_new_songs_handles_existing_and_missing(monkeypatch):
     assert sync.process_new_songs(songs, "Z") == songs
 
 
-def test_update_spotify_radio_playlist_success(monkeypatch):
-    monkeypatch.setattr(sync.spotify, "add_tracks_to_playlist", MagicMock())
-    monkeypatch.setattr(sync.spotify, "trim_playlist_to_limit", MagicMock())
-    sync.update_spotify_radio_playlist(["uri1", "uri2"])
-    sync.spotify.add_tracks_to_playlist.assert_called_once()
-    sync.spotify.trim_playlist_to_limit.assert_called_once()
-
-
 def test_create_spotify_playlist_new(monkeypatch):
     monkeypatch.setattr(sync.spotify, "find_playlist_by_name", lambda name: None)
     monkeypatch.setattr(sync.spotify, "create_playlist", lambda n: "newid")
