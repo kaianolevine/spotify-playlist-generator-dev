@@ -7,6 +7,7 @@ from datetime import datetime
 
 import kaiano_common_utils.google_drive as drive
 import kaiano_common_utils.google_sheets as sheets
+import kaiano_common_utils.logger as log
 import kaiano_common_utils.m3u_parsing as m3u
 import kaiano_common_utils.sheets_formatting as formatting
 from dotenv import load_dotenv
@@ -14,7 +15,6 @@ from googleapiclient.errors import HttpError
 from kaiano_common_utils import spotify
 
 import spotify_playlist_generator.config as config
-import spotify_playlist_generator.logger as log
 
 log = log.get_logger()
 
