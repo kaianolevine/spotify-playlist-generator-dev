@@ -25,7 +25,7 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] [%(filename)s:%(lineno)d - %(funcName)s] %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
-logger = logging.getLogger("kaiano_common_utils")
+logger = logging.getLogger("spotify_playlist_generator")
 logging.getLogger().warning(f"Logger level set to: {level_to_set}")
 
 # Shortcut aliases
