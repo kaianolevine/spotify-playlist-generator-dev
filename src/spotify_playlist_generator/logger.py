@@ -9,24 +9,29 @@ load_dotenv()
 
 
 default_level = logging.WARNING
-level_to_set = os.getenv("LOGGING_LEVEL", "").upper()
-valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
-if level_to_set in valid_levels:
-    logging.getLogger().warning(f"Logger level set to: {level_to_set}")
-else:
-    logging.getLogger().warning(
-        f"Invalid logging level: {level_to_set}. Level not changed.\n"
-        f"default_level: {default_level}"
-    )
-    level_to_set = default_level
-
 logging.basicConfig(
-    level=level_to_set,
+    level=default_level,
     format="%(asctime)s [%(levelname)s] [%(filename)s:%(lineno)d - %(funcName)s] %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger("spotify_playlist_generator")
-logging.getLogger().warning(f"Logger level set to: {level_to_set}")
+
+level_to_set = os.getenv("LOGGING_LEVEL", "").upper()
+valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+if level_to_set in valid_levels:
+    logger.warning(f"Logger level set to: {level_to_set}")
+    logging.basicConfig(
+        level=level_to_set,
+        format="%(asctime)s [%(levelname)s] [%(filename)s:%(lineno)d - %(funcName)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    logger.warning(f"Logger level set to: {level_to_set}")
+else:
+    logger.warning(
+        f"Invalid logging level: {level_to_set}. Level not changed.\n"
+        f"default_level: {default_level}"
+    )
+
 
 # Shortcut aliases
 debug = logger.debug
