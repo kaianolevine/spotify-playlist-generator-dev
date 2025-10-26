@@ -1,19 +1,13 @@
 import datetime
 import logging
-import os
 
-from dotenv import load_dotenv
-
-# Load from .env if it exists (useful for local development)
-load_dotenv()
-LOGGING_LEVEL = os.getenv("LOGGING_LEVEL", "").upper()
-default_level = LOGGING_LEVEL
+default_level = logging.WARNING
 logging.basicConfig(
     level=default_level,
     format="%(asctime)s [%(levelname)s] [%(filename)s:%(lineno)d - %(funcName)s] %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
-logger = logging.getLogger("kaiano_common_utils")
+logger = logging.getLogger("spot")
 logging.getLogger().warning(f"Logger level set to: {default_level}")
 
 # Shortcut aliases
