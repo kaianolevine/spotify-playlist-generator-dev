@@ -236,7 +236,7 @@ def log_to_sheets(
     log.debug(f"📋 Loaded sheet: {sheet}")
 
     for (artist, title), uri in zip(matched_songs, found_uris):
-        log.debug(f"📝 Would log synced track: {date}, {title} - {artist}")
+        log.debug(f"📝 Log synced track: {date}, {title} - {artist}")
     rows_to_append = [[date, title, artist] for (artist, title) in matched_songs]
     if rows_to_append:
         log.debug(f"🧪 Writing {len(rows_to_append)} rows to sheet...")
