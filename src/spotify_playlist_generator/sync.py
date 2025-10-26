@@ -9,9 +9,9 @@ import kaiano_common_utils.google_drive as drive
 import kaiano_common_utils.google_sheets as sheets
 import kaiano_common_utils.m3u_parsing as m3u
 import kaiano_common_utils.sheets_formatting as formatting
+import logger as log
 from dotenv import load_dotenv
 from googleapiclient.errors import HttpError
-from kaiano_common_utils import logger as log
 from kaiano_common_utils import spotify
 
 import spotify_playlist_generator.config as config

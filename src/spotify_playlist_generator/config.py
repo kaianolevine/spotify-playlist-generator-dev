@@ -5,8 +5,6 @@ from dotenv import load_dotenv
 # Load from .env if it exists (useful for local development)
 load_dotenv()
 
-LOGGING_LEVEL = os.getenv("LOGGING_LEVEL", "").upper()
-
 VDJ_HISTORY_FOLDER_ID = "1FzuuO3xmL2n-8pZ_B-FyrvGWaLxLED3o"  # VDJ/History
 
 # Spotify configuration
