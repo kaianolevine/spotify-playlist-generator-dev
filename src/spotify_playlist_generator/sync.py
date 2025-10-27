@@ -108,7 +108,7 @@ def log_info_sheet(
 
     try:
         sheets.append_rows(service, spreadsheet_id, "Info!A1", row)
-        log.info(f"🧾 Logged Info row: {row}")
+        log.debug(f"🧾 Logged Info row: {row}")
     except Exception as e:
         log.error(f"⚠️ Failed to append Info row: {e}")
 
@@ -119,7 +119,7 @@ def log_start(sheet_service, spreadsheet_id):
         spreadsheet_id,
         "🔄 Starting Radio Sync...",
     )
-    log.info("Starting debug logging for Westie Radio sync.")
+    log.debug("Starting debug logging for Westie Radio sync.")
 
 
 def get_m3u_files(drive_service, folder_id):
@@ -179,7 +179,7 @@ def create_spotify_playlist_for_file(date_str: str, found_uris: list[str]) -> st
             if found_uris:
                 spotify.add_tracks_to_specific_playlist(playlist_id, found_uris)
                 log.debug(
-                    f"✅ Added {len(found_uris)} (not necessarily) new tracks to existing playlist {playlist_name} (ID: {playlist_id})."
+                    f"✅ Added {len(found_uris)} new tracks (minus duplicates) to existing playlist {playlist_name} (ID: {playlist_id})."
                 )
             else:
                 log.debug(
