@@ -1,4 +1,5 @@
 name: Spotify Sync
+run-name: Spotify Sync (${{ github.event_name }})
 on:
   workflow_dispatch:
   repository_dispatch:
@@ -6,7 +7,6 @@ on:
 
 jobs:
   run-script:
-    name: Spotify Sync (${{ github.event_name }})
     runs-on: ubuntu-latest
     permissions:
       contents: read
