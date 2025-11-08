@@ -6,6 +6,7 @@ on:
 
 jobs:
   run-script:
+    name: Spotify Sync (${{ github.event_name }})
     runs-on: ubuntu-latest
     permissions:
       contents: read
