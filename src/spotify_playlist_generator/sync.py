@@ -3,6 +3,7 @@ sync.py — Main integration script for Westie Radio automation.
 """
 
 import os
+import time
 from datetime import datetime
 
 import kaiano_common_utils.google_drive as drive
@@ -43,11 +44,29 @@ def get_or_create_logging_spreadsheet():
     spreadsheet_id = drive.create_spreadsheet(
         drive_service, spreadsheet_name, folder_id
     )
+
+    sheet_service = sheets.get_sheets_service()
+    if not wait_for_spreadsheet_ready(sheet_service, spreadsheet_id):
+        log.error("❌ Spreadsheet did not become ready in time, continuing anyway...")
+
     setup_logging_spreadsheet(spreadsheet_id)
     log.info(
         f"Created new logging spreadsheet '{spreadsheet_name}' in folder {folder_id}."
     )
     return spreadsheet_id
+
+
+def wait_for_spreadsheet_ready(service, spreadsheet_id, retries=5, delay=1):
+    for attempt in range(1, retries + 1):
+        try:
+            service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+            return True
+        except Exception:
+            log.warning(
+                f"Waiting for spreadsheet to propagate ({attempt}/{retries})..."
+            )
+            time.sleep(delay)
+    return False
 
 
 def setup_logging_spreadsheet(spreadsheet_id):
