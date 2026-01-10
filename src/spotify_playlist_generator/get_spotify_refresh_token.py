@@ -1,5 +1,5 @@
+import config
 from dotenv import load_dotenv
-from kaiano_common_utils import config
 from spotipy import SpotifyOAuth
 
 # Load credentials from your local .env file
