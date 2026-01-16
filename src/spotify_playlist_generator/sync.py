@@ -27,21 +27,6 @@ def extract_date_from_filename(filename: str) -> str:
     return base
 
 
-def create_spreadsheet_in_folder(drive_service, name: str, folder_id: str) -> str:
-    """Create a Google Sheet in the given Drive folder and return its file ID."""
-    body = {
-        "name": name,
-        "mimeType": "application/vnd.google-apps.spreadsheet",
-        "parents": [folder_id],
-    }
-    created = (
-        drive_service.files()
-        .create(body=body, fields="id", supportsAllDrives=True)
-        .execute()
-    )
-    return created["id"]
-
-
 def delete_sheet_by_name(g: GoogleAPI, spreadsheet_id: str, sheet_name: str) -> None:
     """Delete a sheet tab by its title."""
     meta = g.sheets.get_spreadsheet_metadata(spreadsheet_id)
@@ -63,7 +48,6 @@ def get_or_create_logging_spreadsheet(g: GoogleAPI):
     """
     folder_id = config.HISTORY_TO_SPOTIFY_FOLDER_ID
     spreadsheet_name = config.HISTORY_TO_SPOTIFY_SPREADSHEET_NAME
-    drive_service = g.drive_service
 
     # Search for a Google Sheet with the given name in the folder
     files = g.drive.list_files(folder_id, trashed=False, include_folders=True)
@@ -76,12 +60,9 @@ def get_or_create_logging_spreadsheet(g: GoogleAPI):
             return spreadsheet_id
 
     # Not found: create new spreadsheet, move to folder
-    spreadsheet_id = create_spreadsheet_in_folder(
-        drive_service, spreadsheet_name, folder_id
-    )
+    spreadsheet_id = g.drive.create_spreadsheet_in_folder(spreadsheet_name, folder_id)
 
-    sheet_service = g.sheets_service
-    if not wait_for_spreadsheet_ready(sheet_service, spreadsheet_id):
+    if not wait_for_spreadsheet_ready(g, spreadsheet_id):
         log.error("❌ Spreadsheet did not become ready in time, continuing anyway...")
 
     setup_logging_spreadsheet(g, spreadsheet_id)
@@ -91,16 +72,24 @@ def get_or_create_logging_spreadsheet(g: GoogleAPI):
     return spreadsheet_id
 
 
-def wait_for_spreadsheet_ready(service, spreadsheet_id, retries=5, delay=1):
+def wait_for_spreadsheet_ready(
+    g: GoogleAPI, spreadsheet_id: str, retries: int = 5, delay: int = 1
+) -> bool:
+    """Poll until the spreadsheet metadata can be fetched.
+
+    Newly-created Sheets can briefly fail while propagating. This uses the unified
+    Sheets facade rather than calling the raw Sheets API directly.
+    """
     for attempt in range(1, retries + 1):
         try:
-            service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+            g.sheets.get_spreadsheet_metadata(spreadsheet_id)
             return True
         except Exception:
             log.warning(
                 f"Waiting for spreadsheet to propagate ({attempt}/{retries})..."
             )
             time.sleep(delay)
+
     return False
 
 
