@@ -10,8 +10,8 @@ import kaiano_common_utils.logger as log
 import kaiano_common_utils.sheets_formatting as formatting
 from dotenv import load_dotenv
 from googleapiclient.errors import HttpError
-from kaiano_common_utils import spotify
 from kaiano_common_utils.api.google import GoogleAPI
+from kaiano_common_utils.api.spotify.spotify import SpotifyAPI
 from kaiano_common_utils.library.vdj.m3u.api import M3UToolbox
 
 import spotify_playlist_generator.config as config
@@ -270,15 +270,17 @@ def process_new_songs(songs, last_extvdj_line):
     return new_songs
 
 
-def update_spotify_radio_playlist(playlist_id, found_uris):
+def update_spotify_radio_playlist(sp: SpotifyAPI, playlist_id, found_uris):
     try:
-        spotify.add_tracks_to_specific_playlist(playlist_id, found_uris)
-        spotify.trim_playlist_to_limit()
+        sp.add_tracks_to_specific_playlist(playlist_id, found_uris)
+        sp.trim_playlist_to_limit()
     except Exception as e:
         log.error(f"Error updating Spotify playlist: {e}")
 
 
-def create_spotify_playlist_for_file(date_str: str, found_uris: list[str]) -> str:
+def create_spotify_playlist_for_file(
+    sp: SpotifyAPI, date_str: str, found_uris: list[str]
+) -> str:
     if not found_uris:
         log.warning("No URIs provided; skipping playlist creation.")
         return None
@@ -287,7 +289,7 @@ def create_spotify_playlist_for_file(date_str: str, found_uris: list[str]) -> st
     log.debug(f"🎵 Preparing to create/update Spotify playlist: {playlist_name}")
     try:
         # Check for existing playlist
-        existing_playlist = spotify.find_playlist_by_name(playlist_name)
+        existing_playlist = sp.find_playlist_by_name(playlist_name)
         if existing_playlist:
             playlist_id = existing_playlist["id"]
             log.info(
@@ -295,7 +297,7 @@ def create_spotify_playlist_for_file(date_str: str, found_uris: list[str]) -> st
             )
 
             if found_uris:
-                spotify.add_tracks_to_specific_playlist(playlist_id, found_uris)
+                sp.add_tracks_to_specific_playlist(playlist_id, found_uris)
                 log.debug(
                     f"✅ Added {len(found_uris)} new tracks (minus duplicates) to existing playlist {playlist_name} (ID: {playlist_id})."
                 )
@@ -306,14 +308,14 @@ def create_spotify_playlist_for_file(date_str: str, found_uris: list[str]) -> st
             return playlist_id
         else:
             # Create new playlist as before
-            playlist_id = spotify.create_playlist(playlist_name)
+            playlist_id = sp.create_playlist(playlist_name)
             if not playlist_id:
                 log.error(f"❌ Failed to create playlist: {playlist_name}")
                 return None
             unique_uris = list(dict.fromkeys(found_uris))
             duplicates_count = len(found_uris) - len(unique_uris)
             log.debug(f"🔍 Removing duplicates: {duplicates_count} duplicates removed.")
-            spotify.add_tracks_to_specific_playlist(playlist_id, unique_uris)
+            sp.add_tracks_to_specific_playlist(playlist_id, unique_uris)
             log.debug(
                 f"✅ Created playlist {playlist_name} with ID {playlist_id} containing {len(unique_uris)} tracks."
             )
@@ -326,7 +328,12 @@ def create_spotify_playlist_for_file(date_str: str, found_uris: list[str]) -> st
 
 
 def process_file(
-    file, processed_map, g: GoogleAPI, spreadsheet_id, m3u_tool: M3UToolbox
+    file,
+    processed_map,
+    g: GoogleAPI,
+    spreadsheet_id,
+    m3u_tool: M3UToolbox,
+    sp: SpotifyAPI,
 ):
     filename = file["name"]
     file_id = file["id"]
@@ -353,7 +360,7 @@ def process_file(
         matched_extvdj_lines = []
         unfound = []
         for artist, title, extvdj_line in new_songs:
-            uri = spotify.search_track(artist, title)
+            uri = sp.search_track(artist, title)
             log.debug(
                 f"Searching for track - Artist: {artist}, Title: {title}, Found URI: {uri}"
             )
@@ -364,9 +371,9 @@ def process_file(
             else:
                 unfound.append((artist, title, extvdj_line))
 
-        update_spotify_radio_playlist(config.SPOTIFY_PLAYLIST_ID, found_uris)
+        update_spotify_radio_playlist(sp, config.SPOTIFY_PLAYLIST_ID, found_uris)
 
-        playlist_id = create_spotify_playlist_for_file(date, found_uris)
+        playlist_id = create_spotify_playlist_for_file(sp, date, found_uris)
         if playlist_id:
             log.info(f"✅ Playlist created successfully with ID: {playlist_id}")
 
@@ -394,6 +401,7 @@ def main():
     load_dotenv()  # load environment variables
 
     g = GoogleAPI.from_env()
+    sp = SpotifyAPI.from_env()
 
     spreadsheet_id = get_or_create_logging_spreadsheet(g)
     log_start(g, spreadsheet_id)
@@ -414,7 +422,7 @@ def main():
     m3u_tool = M3UToolbox()
 
     for file in m3u_files:
-        process_file(file, processed_map, g, spreadsheet_id, m3u_tool)
+        process_file(file, processed_map, g, spreadsheet_id, m3u_tool, sp)
 
     formatting.apply_formatting_to_sheet(spreadsheet_id)
     log_info_sheet(g, spreadsheet_id, "✅ Sync complete.")
