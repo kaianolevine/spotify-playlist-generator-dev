@@ -6,50 +6,85 @@ import os
 import time
 from datetime import datetime
 
-import kaiano_common_utils.google_drive as drive
-import kaiano_common_utils.google_sheets as sheets
 import kaiano_common_utils.logger as log
-import kaiano_common_utils.m3u_parsing as m3u
 import kaiano_common_utils.sheets_formatting as formatting
 from dotenv import load_dotenv
 from googleapiclient.errors import HttpError
 from kaiano_common_utils import spotify
+from kaiano_common_utils.api.google import GoogleAPI
+from kaiano_common_utils.library.vdj.m3u.api import M3UToolbox
 
 import spotify_playlist_generator.config as config
 
 log = log.get_logger()
 
 
+def extract_date_from_filename(filename: str) -> str:
+    """Extract YYYY-MM-DD prefix from a filename; fall back to filename if missing."""
+    base = os.path.basename(filename)
+    if len(base) >= 10 and base[4] == "-" and base[7] == "-":
+        return base[:10]
+    return base
+
+
+def create_spreadsheet_in_folder(drive_service, name: str, folder_id: str) -> str:
+    """Create a Google Sheet in the given Drive folder and return its file ID."""
+    body = {
+        "name": name,
+        "mimeType": "application/vnd.google-apps.spreadsheet",
+        "parents": [folder_id],
+    }
+    created = (
+        drive_service.files()
+        .create(body=body, fields="id", supportsAllDrives=True)
+        .execute()
+    )
+    return created["id"]
+
+
+def delete_sheet_by_name(g: GoogleAPI, spreadsheet_id: str, sheet_name: str) -> None:
+    """Delete a sheet tab by its title."""
+    meta = g.sheets.get_spreadsheet_metadata(spreadsheet_id)
+    for sheet in meta.get("sheets", []):
+        props = sheet.get("properties", {})
+        if props.get("title") == sheet_name:
+            sheet_id = props.get("sheetId")
+            g.sheets.batch_update(
+                spreadsheet_id, [{"deleteSheet": {"sheetId": sheet_id}}]
+            )
+            return
+
+
 # --- Logging spreadsheet management ---
-def get_or_create_logging_spreadsheet():
+def get_or_create_logging_spreadsheet(g: GoogleAPI):
     """
     Locate the logging spreadsheet by name in the configured folder, or create it if missing.
     Ensures the required sheets exist.
     """
     folder_id = config.HISTORY_TO_SPOTIFY_FOLDER_ID
     spreadsheet_name = config.HISTORY_TO_SPOTIFY_SPREADSHEET_NAME
-    drive_service = drive.get_drive_service()
+    drive_service = g.drive_service
 
     # Search for a Google Sheet with the given name in the folder
-    files = drive.list_files_in_folder(drive_service, folder_id)
+    files = g.drive.list_files(folder_id, trashed=False, include_folders=True)
     for f in files:
-        if f["name"] == spreadsheet_name and f.get("mimeType", "").startswith(
+        if f.name == spreadsheet_name and (f.mime_type or "").startswith(
             "application/vnd.google-apps.spreadsheet"
         ):
-            spreadsheet_id = f["id"]
-            setup_logging_spreadsheet(spreadsheet_id)
+            spreadsheet_id = f.id
+            setup_logging_spreadsheet(g, spreadsheet_id)
             return spreadsheet_id
 
     # Not found: create new spreadsheet, move to folder
-    spreadsheet_id = drive.create_spreadsheet(
+    spreadsheet_id = create_spreadsheet_in_folder(
         drive_service, spreadsheet_name, folder_id
     )
 
-    sheet_service = sheets.get_sheets_service()
+    sheet_service = g.sheets_service
     if not wait_for_spreadsheet_ready(sheet_service, spreadsheet_id):
         log.error("❌ Spreadsheet did not become ready in time, continuing anyway...")
 
-    setup_logging_spreadsheet(spreadsheet_id)
+    setup_logging_spreadsheet(g, spreadsheet_id)
     log.info(
         f"Created new logging spreadsheet '{spreadsheet_name}' in folder {folder_id}."
     )
@@ -69,7 +104,7 @@ def wait_for_spreadsheet_ready(service, spreadsheet_id, retries=5, delay=1):
     return False
 
 
-def setup_logging_spreadsheet(spreadsheet_id):
+def setup_logging_spreadsheet(g: GoogleAPI, spreadsheet_id):
     """
     Ensure the logging spreadsheet contains only the required sheets with correct headers.
     """
@@ -79,26 +114,26 @@ def setup_logging_spreadsheet(spreadsheet_id):
         "Songs Added": ["Date", "Title", "Artist"],
         "Songs Not Found": ["Date", "Title", "Artist"],
     }
-    sheet_service = sheets.get_sheets_service()
+    sheet_service = g.sheets_service
     # Create/ensure each required sheet with headers
     for sheet_name, headers in required_sheets.items():
-        sheets.ensure_sheet_exists(
+        g.sheets.ensure_sheet_exists(
             sheet_service, spreadsheet_id, sheet_name, headers=headers
         )
     # Remove any other sheets
     try:
-        metadata = sheets.get_sheet_metadata(sheet_service, spreadsheet_id)
+        metadata = g.sheets.get_spreadsheet_metadata(spreadsheet_id)
         for sheet_info in metadata.get("sheets", []):
             title = sheet_info.get("properties", {}).get("title", "")
             if title not in required_sheets:
-                sheets.delete_sheet_by_name(sheet_service, spreadsheet_id, title)
+                delete_sheet_by_name(g, spreadsheet_id, title)
                 log.info(f"🗑 Deleted extraneous sheet '{title}'.")
     except HttpError as e:
         log.error(f"⚠️ Failed to clean up sheets: {e}")
 
 
 def log_info_sheet(
-    service,
+    g: GoogleAPI,
     spreadsheet_id: str,
     message: str = None,
     processed: str = None,
@@ -109,8 +144,8 @@ def log_info_sheet(
     timestamp = datetime.now().replace(microsecond=0).isoformat(sep=" ")
 
     # Ensure Info sheet exists with correct headers
-    sheets.ensure_sheet_exists(
-        service,
+    g.sheets.ensure_sheet_exists(
+        g.sheets_service,
         spreadsheet_id,
         "Info",
         headers=["Timestamp", "Message", "Processed", "Found", "Unfound"],
@@ -126,34 +161,113 @@ def log_info_sheet(
         return
 
     try:
-        sheets.append_rows(service, spreadsheet_id, "Info!A1", row)
+        g.sheets.append_values(spreadsheet_id, "Info!A1", row, value_input_option="RAW")
         log.debug(f"🧾 Logged Info row: {row}")
     except Exception as e:
         log.error(f"⚠️ Failed to append Info row: {e}")
 
 
-def log_start(sheet_service, spreadsheet_id):
+def log_start(g: GoogleAPI, spreadsheet_id):
     log_info_sheet(
-        sheet_service,
+        g,
         spreadsheet_id,
         "🔄 Starting Radio Sync...",
     )
     log.debug("Starting debug logging for Westie Radio sync.")
 
 
-def get_m3u_files(drive_service, folder_id):
-    all_files = drive.list_files_in_folder(drive_service, folder_id)
-    m3u_files = sorted(
-        [f for f in all_files if f["name"].lower().endswith(".m3u")],
-        key=lambda f: f["name"],
-    )
-    return m3u_files
-
-
-def load_processed_map(sheet_service, spreadsheet_id):
-    processed_rows = sheets.read_sheet(sheet_service, spreadsheet_id, "Processed!A2:C")
+def load_processed_map(g: GoogleAPI, spreadsheet_id):
+    processed_rows = g.sheets.read_values(spreadsheet_id, "Processed!A2:C")
     processed_map = {row[0]: row[2] for row in processed_rows if len(row) >= 3}
     return processed_map
+
+
+whitespace_buffer = ""
+
+
+def log_to_sheets(
+    g: GoogleAPI,
+    spreadsheet_id,
+    date,
+    matched_songs,
+    found_uris,
+    unfound,
+    filename,
+    new_songs,
+    last_extvdj_line,
+    playlist_id=None,
+):
+    log_info_sheet(
+        g,
+        spreadsheet_id,
+        f"🎶 Processed file: {filename}{whitespace_buffer}",
+        f"Processed rows: {len(new_songs)}{whitespace_buffer}",
+        f"✅ Found tracks: {len(found_uris)}{whitespace_buffer}",
+        f"❌ Unfound tracks: {len(unfound)}{whitespace_buffer}",
+    )
+
+    for (artist, title), uri in zip(matched_songs, found_uris):
+        log.debug(f"📝 Log synced track: {date}, {title} - {artist}")
+    rows_to_append = [[date, title, artist] for (artist, title) in matched_songs]
+    if rows_to_append:
+        log.debug(f"🧪 Writing {len(rows_to_append)} rows to sheet...")
+        try:
+            g.sheets.append_values(
+                spreadsheet_id, "Songs Added", rows_to_append, value_input_option="RAW"
+            )
+        except Exception as e:
+            log.error(f"Failed to append to Songs Added: {e}")
+    else:
+        log.debug("🧪 No rows to write to Songs Added.")
+
+    # Log unfound songs to "Songs Not Found"
+    unfound_rows = [[date, title, artist] for artist, title, _ in unfound]
+    if unfound_rows:
+        log.debug(f"🧪 Unfound Tracks: {len(unfound_rows)}")
+        try:
+            g.sheets.append_values(
+                spreadsheet_id,
+                "Songs Not Found",
+                unfound_rows,
+                value_input_option="RAW",
+            )
+        except Exception as e:
+            log.error(f"Failed to append to Songs Not Found: {e}")
+
+    # Log processing summary to "Processed" tab
+    last_logged_extvdj_line = new_songs[-1][2] if new_songs else last_extvdj_line
+    if playlist_id:
+        updated_row = [filename, playlist_id, last_logged_extvdj_line]
+        log.debug(f"Logging playlist ID in Processed sheet: {playlist_id}")
+    else:
+        updated_row = [filename, last_logged_extvdj_line]
+    try:
+        log.debug(f"Updating Processed log: {updated_row}")
+        log.debug(f"Last logged ExtVDJ line: {last_logged_extvdj_line}")
+        all_rows = g.sheets.read_values(spreadsheet_id, "Processed!A2:C")
+        log.debug(f"all rows: {all_rows}")
+        filenames = [row[0] for row in all_rows]
+        log.debug(f"all filenames: {filenames}")
+        if filename in filenames:
+            log.debug(f"Found filename in processed: {filename}")
+            row_index = filenames.index(filename) + 2  # account for header
+            log.debug(f"Updating row {row_index} in Processed")
+            g.sheets.write_values(
+                spreadsheet_id,
+                f"Processed!A{row_index}:C{row_index}",
+                [updated_row],
+                value_input_option="RAW",
+            )
+        else:
+            g.sheets.append_values(
+                spreadsheet_id, "Processed", [updated_row], value_input_option="RAW"
+            )
+            log.debug(f"Appended new row to Processed: {updated_row}")
+        g.sheets.sort_sheet(
+            spreadsheet_id, "Processed", column_index=2, ascending=False, start_row=2
+        )
+    except Exception as e:
+        log.error(f"Failed to update Processed log: {e}")
 
 
 def process_new_songs(songs, last_extvdj_line):
@@ -226,102 +340,16 @@ def create_spotify_playlist_for_file(date_str: str, found_uris: list[str]) -> st
         return None
 
 
-whitespace_buffer = ""
-
-
-def log_to_sheets(
-    sheet_service,
-    spreadsheet_id,
-    date,
-    matched_songs,
-    found_uris,
-    unfound,
-    filename,
-    new_songs,
-    last_extvdj_line,
-    playlist_id=None,
+def process_file(
+    file, processed_map, g: GoogleAPI, spreadsheet_id, m3u_tool: M3UToolbox
 ):
-    log_info_sheet(
-        sheet_service,
-        spreadsheet_id,
-        f"🎶 Processed file: {filename}{whitespace_buffer}",
-        f"Processed rows: {len(new_songs)}{whitespace_buffer}",
-        f"✅ Found tracks: {len(found_uris)}{whitespace_buffer}",
-        f"❌ Unfound tracks: {len(unfound)}{whitespace_buffer}",
-    )
-
-    # Log Songs Added
-    sheet = sheets.read_sheet(sheet_service, spreadsheet_id, "Songs Added")
-    log.debug(f"📋 Loaded sheet: {sheet}")
-
-    for (artist, title), uri in zip(matched_songs, found_uris):
-        log.debug(f"📝 Log synced track: {date}, {title} - {artist}")
-    rows_to_append = [[date, title, artist] for (artist, title) in matched_songs]
-    if rows_to_append:
-        log.debug(f"🧪 Writing {len(rows_to_append)} rows to sheet...")
-        try:
-            sheets.append_rows(
-                sheet_service, spreadsheet_id, "Songs Added", rows_to_append
-            )
-        except Exception as e:
-            log.error(f"Failed to append to Songs Added: {e}")
-    else:
-        log.debug("🧪 No rows to write to Songs Added.")
-
-    # Log unfound songs to "Songs Not Found"
-    unfound_rows = [[date, title, artist] for artist, title, _ in unfound]
-    if unfound_rows:
-        log.debug(f"🧪 Unfound Tracks: {len(unfound_rows)}")
-        try:
-            sheets.append_rows(
-                sheet_service, spreadsheet_id, "Songs Not Found", unfound_rows
-            )
-        except Exception as e:
-            log.error(f"Failed to append to Songs Not Found: {e}")
-
-    # Log processing summary to "Processed" tab
-    last_logged_extvdj_line = new_songs[-1][2] if new_songs else last_extvdj_line
-    if playlist_id:
-        updated_row = [filename, playlist_id, last_logged_extvdj_line]
-        log.debug(f"Logging playlist ID in Processed sheet: {playlist_id}")
-    else:
-        updated_row = [filename, last_logged_extvdj_line]
-    try:
-        log.debug(f"Updating Processed log: {updated_row}")
-        log.debug(f"Last logged ExtVDJ line: {last_logged_extvdj_line}")
-        all_rows = sheets.read_sheet(sheet_service, spreadsheet_id, "Processed!A2:C")
-        log.debug(f"all rows: {all_rows}")
-        filenames = [row[0] for row in all_rows]
-        log.debug(f"all filenames: {filenames}")
-        if filename in filenames:
-            log.debug(f"Found filename in processed: {filename}")
-            row_index = filenames.index(filename) + 2  # account for header
-            log.debug(f"Updating row {row_index} in Processed")
-            sheets.update_row(
-                spreadsheet_id,
-                f"Processed!A{row_index}:C{row_index}",
-                [updated_row],
-            )
-        else:
-            sheets.append_rows(
-                sheet_service, spreadsheet_id, "Processed", [updated_row]
-            )
-            log.debug(f"Appended new row to Processed: {updated_row}")
-        sheets.sort_sheet_by_column(
-            sheet_service, spreadsheet_id, "Processed", column_index=2, ascending=False
-        )
-    except Exception as e:
-        log.error(f"Failed to update Processed log: {e}")
-
-
-def process_file(file, processed_map, sheet_service, spreadsheet_id, drive_service):
     filename = file["name"]
     file_id = file["id"]
-    date = drive.extract_date_from_filename(filename)
+    date = extract_date_from_filename(filename)
 
     try:
-        drive.download_file(drive_service, file_id, filename)
-        songs = m3u.parse_m3u(sheet_service, filename, spreadsheet_id)
+        g.drive.download_file(file_id, filename)
+        songs = m3u_tool.parse.parse_m3u(None, filename, spreadsheet_id)
 
         last_extvdj_line = processed_map.get(filename)
         new_songs = process_new_songs(songs, last_extvdj_line)
@@ -360,7 +388,7 @@ def process_file(file, processed_map, sheet_service, spreadsheet_id, drive_servi
             log.error(f"❌ Playlist creation failed for date: {date}")
 
         log_to_sheets(
-            sheet_service,
+            g,
             spreadsheet_id,
             date,
             matched_songs,
@@ -382,9 +410,10 @@ def process_file(file, processed_map, sheet_service, spreadsheet_id, drive_servi
 def main():
     load_dotenv()  # load environment variables
 
-    sheet_service = sheets.get_sheets_service()
-    spreadsheet_id = get_or_create_logging_spreadsheet()
-    log_start(sheet_service, spreadsheet_id)
+    g = GoogleAPI.from_env()
+
+    spreadsheet_id = get_or_create_logging_spreadsheet(g)
+    log_start(g, spreadsheet_id)
 
     folder_id = config.VDJ_HISTORY_FOLDER_ID
     if not folder_id:
@@ -392,20 +421,20 @@ def main():
         raise ValueError("Missing environment variable: VDJ_HISTORY_FOLDER_ID")
     log.info(f"📁 Loaded VDJ_HISTORY_FOLDER_ID: {folder_id}")
 
-    drive_service = drive.get_drive_service()
-    m3u_files = get_m3u_files(drive_service, folder_id)
+    m3u_files = g.drive.get_all_m3u_files()
 
     if not m3u_files:
-        log_info_sheet(sheet_service, spreadsheet_id, "❌ No .m3u files found.")
+        log_info_sheet(g, spreadsheet_id, "❌ No .m3u files found.")
         return
 
-    processed_map = load_processed_map(sheet_service, spreadsheet_id)
+    processed_map = load_processed_map(g, spreadsheet_id)
+    m3u_tool = M3UToolbox()
 
     for file in m3u_files:
-        process_file(file, processed_map, sheet_service, spreadsheet_id, drive_service)
+        process_file(file, processed_map, g, spreadsheet_id, m3u_tool)
 
     formatting.apply_formatting_to_sheet(spreadsheet_id)
-    log_info_sheet(sheet_service, spreadsheet_id, "✅ Sync complete.")
+    log_info_sheet(g, spreadsheet_id, "✅ Sync complete.")
     log.info("✅ Sync complete.")
 
 
