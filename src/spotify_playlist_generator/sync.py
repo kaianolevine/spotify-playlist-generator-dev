@@ -103,12 +103,9 @@ def setup_logging_spreadsheet(g: GoogleAPI, spreadsheet_id):
         "Songs Added": ["Date", "Title", "Artist"],
         "Songs Not Found": ["Date", "Title", "Artist"],
     }
-    sheet_service = g.sheets_service
     # Create/ensure each required sheet with headers
     for sheet_name, headers in required_sheets.items():
-        g.sheets.ensure_sheet_exists(
-            sheet_service, spreadsheet_id, sheet_name, headers=headers
-        )
+        g.sheets.ensure_sheet_exists(spreadsheet_id, sheet_name, headers=headers)
     # Remove any other sheets
     try:
         metadata = g.sheets.get_spreadsheet_metadata(spreadsheet_id)
@@ -134,7 +131,6 @@ def log_info_sheet(
 
     # Ensure Info sheet exists with correct headers
     g.sheets.ensure_sheet_exists(
-        g.sheets_service,
         spreadsheet_id,
         "Info",
         headers=["Timestamp", "Message", "Processed", "Found", "Unfound"],
