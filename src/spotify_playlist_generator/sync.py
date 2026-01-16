@@ -369,8 +369,6 @@ def process_file(
         playlist_id = create_spotify_playlist_for_file(date, found_uris)
         if playlist_id:
             log.info(f"✅ Playlist created successfully with ID: {playlist_id}")
-        else:
-            log.error(f"❌ Playlist creation failed for date: {date}")
 
         log_to_sheets(
             g,
