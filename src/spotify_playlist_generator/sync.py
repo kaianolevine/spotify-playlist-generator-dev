@@ -29,7 +29,7 @@ def extract_date_from_filename(filename: str) -> str:
 
 def delete_sheet_by_name(g: GoogleAPI, spreadsheet_id: str, sheet_name: str) -> None:
     """Delete a sheet tab by its title."""
-    meta = g.sheets.get_spreadsheet_metadata(spreadsheet_id)
+    meta = g.sheets.get_metadata(spreadsheet_id)
     for sheet in meta.get("sheets", []):
         props = sheet.get("properties", {})
         if props.get("title") == sheet_name:
@@ -82,7 +82,7 @@ def wait_for_spreadsheet_ready(
     """
     for attempt in range(1, retries + 1):
         try:
-            g.sheets.get_spreadsheet_metadata(spreadsheet_id)
+            g.sheets.get_metadata(spreadsheet_id)
             return True
         except Exception:
             log.warning(
@@ -108,7 +108,7 @@ def setup_logging_spreadsheet(g: GoogleAPI, spreadsheet_id):
         g.sheets.ensure_sheet_exists(spreadsheet_id, sheet_name, headers=headers)
     # Remove any other sheets
     try:
-        metadata = g.sheets.get_spreadsheet_metadata(spreadsheet_id)
+        metadata = g.sheets.get_metadata(spreadsheet_id)
         for sheet_info in metadata.get("sheets", []):
             title = sheet_info.get("properties", {}).get("title", "")
             if title not in required_sheets:
