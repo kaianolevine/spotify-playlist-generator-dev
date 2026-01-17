@@ -97,10 +97,10 @@ class SpreadsheetLogger:
         }
         for sheet_name, headers in required_sheets.items():
             self.g.sheets.ensure_sheet_exists(
-                self._require_spreadsheet_id(), sheet_name, headers=headers
+                self.spreadsheet_id, sheet_name, headers=headers
             )
         try:
-            metadata = self.g.sheets.get_metadata(self._require_spreadsheet_id())
+            metadata = self.g.sheets.get_metadata(self.spreadsheet_id)
             for sheet_info in metadata.get("sheets", []):
                 props = sheet_info.get("properties", {})
                 title = props.get("title", "")
@@ -108,7 +108,7 @@ class SpreadsheetLogger:
 
                 if title not in required_sheets and sheet_id is not None:
                     self.g.sheets.batch_update(
-                        self._require_spreadsheet_id(),
+                        self.spreadsheet_id,
                         [{"deleteSheet": {"sheetId": sheet_id}}],
                     )
                     log.info(f"🗑 Deleted extraneous sheet '{title}'.")
@@ -143,13 +143,12 @@ class SpreadsheetLogger:
         processed_update: dict | None = None,
     ) -> None:
         """Unified spreadsheet logger."""
-        spreadsheet_id = self._require_spreadsheet_id()
         timestamp = datetime.now().replace(microsecond=0).isoformat(sep=" ")
 
         # --- Info tab ---
         if info_message is not None:
             self.g.sheets.ensure_sheet_exists(
-                spreadsheet_id,
+                self.spreadsheet_id,
                 "Info",
                 headers=["Timestamp", "Message", "Processed", "Found", "Unfound"],
             )
@@ -192,7 +191,7 @@ class SpreadsheetLogger:
                 )
                 return
 
-            all_rows = self.g.sheets.read_values(spreadsheet_id, "Processed!A2:C")
+            all_rows = self.g.sheets.read_values(self.spreadsheet_id, "Processed!A2:C")
             filenames = [row[0] for row in all_rows if row]
 
             updated_row = [filename, playlist_id or "", extvdj_line]
@@ -200,7 +199,7 @@ class SpreadsheetLogger:
             if filename in filenames:
                 row_index = filenames.index(filename) + 2
                 self.g.sheets.write_values(
-                    spreadsheet_id,
+                    self.spreadsheet_id,
                     f"Processed!A{row_index}:C{row_index}",
                     [updated_row],
                     value_input_option="RAW",
@@ -213,7 +212,7 @@ class SpreadsheetLogger:
                 )
             try:
                 self.g.sheets.sort_sheet(
-                    spreadsheet_id,
+                    self.spreadsheet_id,
                     "Processed",
                     column_index=2,
                     ascending=False,
@@ -247,8 +246,9 @@ class SpreadsheetLogger:
         log.debug("Starting debug logging for Westie Radio sync.")
 
     def load_processed_map(self) -> dict:
-        spreadsheet_id = self._require_spreadsheet_id()
-        processed_rows = self.g.sheets.read_values(spreadsheet_id, "Processed!A2:C")
+        processed_rows = self.g.sheets.read_values(
+            self.spreadsheet_id, "Processed!A2:C"
+        )
         processed_map = {row[0]: row[2] for row in processed_rows if len(row) >= 3}
         return processed_map
 
