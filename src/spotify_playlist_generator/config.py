@@ -1,10 +1,5 @@
 import os
 
-from dotenv import load_dotenv
-
-# Load from .env if it exists (useful for local development)
-load_dotenv()
-
 VDJ_HISTORY_FOLDER_ID = "1HGxEr5ocY9JLtXcJqDRIOD95rXU6QLUW"  # VDJ/History
 
 # Spotify configuration
@@ -12,10 +7,6 @@ SPOTIPY_CLIENT_ID = os.getenv("SPOTIPY_CLIENT_ID")
 SPOTIPY_CLIENT_SECRET = os.getenv("SPOTIPY_CLIENT_SECRET")
 SPOTIPY_REFRESH_TOKEN = os.getenv("SPOTIPY_REFRESH_TOKEN")
 SPOTIPY_REDIRECT_URI = "http://127.0.0.1:8888/callback"
-SPOTIFY_CLIENT_ID = SPOTIPY_CLIENT_ID
-SPOTIFY_CLIENT_SECRET = SPOTIPY_CLIENT_SECRET
-SPOTIFY_REFRESH_TOKEN = SPOTIPY_REFRESH_TOKEN
-SPOTIFY_REDIRECT_URI = SPOTIPY_REDIRECT_URI
 SPOTIFY_USERNAME = "31oya3ie2f5wwlqt6tnfurou6zzq"  # Deejey Marvel Automations
 SPOTIFY_PLAYLIST_ID = "3gmOQhmxoEN1KTikr1S2QL"  # TestPlaylist
 
