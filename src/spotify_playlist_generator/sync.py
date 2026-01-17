@@ -167,7 +167,7 @@ def main() -> None:
     m3u_tool = M3UToolbox()
 
     logger = SpreadsheetLogger(g)
-    spreadsheet_id = logger.get_or_create_logging_spreadsheet(
+    spreadsheet_id = logger.get_logging_spreadsheet(
         config.HISTORY_TO_SPOTIFY_FOLDER_ID,
         config.HISTORY_TO_SPOTIFY_SPREADSHEET_NAME,
     )

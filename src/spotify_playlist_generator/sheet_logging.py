@@ -38,9 +38,7 @@ class SpreadsheetLogger:
                 )
                 return
 
-    def get_or_create_logging_spreadsheet(
-        self, folder_id: str, spreadsheet_name: str
-    ) -> str:
+    def get_logging_spreadsheet(self, folder_id: str, spreadsheet_name: str) -> str:
         """
         Locate the logging spreadsheet by name in the configured folder, or create it if missing.
         Ensures the required sheets exist.
@@ -257,13 +255,12 @@ class SpreadsheetLogger:
         last_extvdj_line,
         playlist_id=None,
     ):
-        # whitespace_buffer is a module-level global
-        global whitespace_buffer
+
         self.log_spreadsheet(
-            info_message=f"🎶 Processed file: {filename}{whitespace_buffer}",
-            processed_summary=f"Processed rows: {len(new_songs)}{whitespace_buffer}",
-            found_summary=f"✅ Found tracks: {len(found_uris)}{whitespace_buffer}",
-            unfound_summary=f"❌ Unfound tracks: {len(unfound)}{whitespace_buffer}",
+            info_message=f"🎶 Processed file: {filename}",
+            processed_summary=f"Processed rows: {len(new_songs)}",
+            found_summary=f"✅ Found tracks: {len(found_uris)}",
+            unfound_summary=f"❌ Unfound tracks: {len(unfound)}",
             songs_added=(
                 [[date, title, artist] for (artist, title) in matched_songs]
                 if matched_songs
@@ -284,106 +281,3 @@ class SpreadsheetLogger:
     def format(self) -> None:
         spreadsheet_id = self._require_spreadsheet_id()
         formatting.apply_formatting_to_sheet(spreadsheet_id)
-
-
-whitespace_buffer = ""
-
-# --- Module-level wrappers for backward compatibility ---
-
-
-def delete_sheet_by_name(g: GoogleAPI, spreadsheet_id: str, sheet_name: str) -> None:
-    return SpreadsheetLogger(g, spreadsheet_id=spreadsheet_id).delete_sheet_by_name(
-        sheet_name
-    )
-
-
-def get_or_create_logging_spreadsheet(
-    g: GoogleAPI, folder_id: str, spreadsheet_name: str
-) -> str:
-    return SpreadsheetLogger(g).get_or_create_logging_spreadsheet(
-        folder_id, spreadsheet_name
-    )
-
-
-def wait_for_spreadsheet_ready(
-    g: GoogleAPI, spreadsheet_id: str, retries: int = 5, delay: int = 1
-) -> bool:
-    return SpreadsheetLogger(g).wait_for_spreadsheet_ready(
-        spreadsheet_id, retries=retries, delay=delay
-    )
-
-
-def setup_logging_spreadsheet(g: GoogleAPI, spreadsheet_id):
-    return SpreadsheetLogger(g).setup_logging_spreadsheet(spreadsheet_id)
-
-
-def log_spreadsheet(
-    g: GoogleAPI,
-    spreadsheet_id: str,
-    *,
-    info_message: str | None = None,
-    processed_summary: str | None = None,
-    found_summary: str | None = None,
-    unfound_summary: str | None = None,
-    songs_added: list[list[str]] | None = None,
-    songs_not_found: list[list[str]] | None = None,
-    processed_update: dict | None = None,
-) -> None:
-    return SpreadsheetLogger(g, spreadsheet_id=spreadsheet_id).log_spreadsheet(
-        info_message=info_message,
-        processed_summary=processed_summary,
-        found_summary=found_summary,
-        unfound_summary=unfound_summary,
-        songs_added=songs_added,
-        songs_not_found=songs_not_found,
-        processed_update=processed_update,
-    )
-
-
-def log_info_sheet(
-    g: GoogleAPI,
-    spreadsheet_id: str,
-    message: str = None,
-    processed: str = None,
-    found: str = None,
-    unfound: str = None,
-):
-    return SpreadsheetLogger(g, spreadsheet_id=spreadsheet_id).log_info_sheet(
-        message=message, processed=processed, found=found, unfound=unfound
-    )
-
-
-def log_start(g: GoogleAPI, spreadsheet_id):
-    return SpreadsheetLogger(g, spreadsheet_id=spreadsheet_id).log_start()
-
-
-def load_processed_map(g: GoogleAPI, spreadsheet_id):
-    return SpreadsheetLogger(g, spreadsheet_id=spreadsheet_id).load_processed_map()
-
-
-def log_to_sheets(
-    g: GoogleAPI,
-    spreadsheet_id,
-    date,
-    matched_songs,
-    found_uris,
-    unfound,
-    filename,
-    new_songs,
-    last_extvdj_line,
-    playlist_id=None,
-):
-    return SpreadsheetLogger(g, spreadsheet_id=spreadsheet_id).log_to_sheets(
-        date,
-        matched_songs,
-        found_uris,
-        unfound,
-        filename,
-        new_songs,
-        last_extvdj_line,
-        playlist_id=playlist_id,
-    )
-
-
-def format(spreadsheet_id):
-    formatting.apply_formatting_to_sheet(spreadsheet_id)
