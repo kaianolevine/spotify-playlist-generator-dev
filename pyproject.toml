@@ -31,6 +31,9 @@ build-backend = "poetry.core.masonry.api"
 branch = true
 source = ["src"]
 
+[tool.isort]
+profile = "black"
+
 [tool.coverage.report]
 fail_under = 90
 show_missing = true
