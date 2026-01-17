@@ -6,8 +6,6 @@ import kaiano_common_utils.sheets_formatting as formatting
 from googleapiclient.errors import HttpError
 from kaiano_common_utils.api.google import GoogleAPI
 
-import spotify_playlist_generator.config as config
-
 
 def delete_sheet_by_name(g: GoogleAPI, spreadsheet_id: str, sheet_name: str) -> None:
     """Delete a sheet tab by its title."""
@@ -23,13 +21,13 @@ def delete_sheet_by_name(g: GoogleAPI, spreadsheet_id: str, sheet_name: str) -> 
 
 
 # --- Logging spreadsheet management ---
-def get_or_create_logging_spreadsheet(g: GoogleAPI):
+def get_or_create_logging_spreadsheet(
+    g: GoogleAPI, folder_id: str, spreadsheet_name: str
+) -> str:
     """
     Locate the logging spreadsheet by name in the configured folder, or create it if missing.
     Ensures the required sheets exist.
     """
-    folder_id = config.HISTORY_TO_SPOTIFY_FOLDER_ID
-    spreadsheet_name = config.HISTORY_TO_SPOTIFY_SPREADSHEET_NAME
 
     # Search for a Google Sheet with the given name in the folder
     files = g.drive.list_files(folder_id, trashed=False, include_folders=True)

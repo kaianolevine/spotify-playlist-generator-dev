@@ -4,6 +4,7 @@ sync.py — Main integration script for Westie Radio automation.
 
 import os
 
+import config
 import kaiano_common_utils.logger as log
 from dotenv import load_dotenv
 from kaiano_common_utils.api.google import GoogleAPI
@@ -17,8 +18,6 @@ from sheet_logging import (
     log_start,
     log_to_sheets,
 )
-
-import spotify_playlist_generator.config as config
 
 log = log.get_logger()
 
@@ -179,7 +178,11 @@ def main():
     g = GoogleAPI.from_env()
     sp = SpotifyAPI.from_env()
 
-    spreadsheet_id = get_or_create_logging_spreadsheet(g)
+    spreadsheet_id = get_or_create_logging_spreadsheet(
+        g,
+        config.HISTORY_TO_SPOTIFY_FOLDER_ID,
+        config.HISTORY_TO_SPOTIFY_SPREADSHEET_NAME,
+    )
     log_start(g, spreadsheet_id)
 
     folder_id = config.VDJ_HISTORY_FOLDER_ID
