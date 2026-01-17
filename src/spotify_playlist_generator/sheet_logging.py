@@ -5,8 +5,8 @@ from datetime import datetime
 
 import kaiano_common_utils.logger as log
 from googleapiclient.errors import HttpError
-from kaiano_common_utils.api.google import GoogleAPI
-from kaiano_common_utils.api.google import sheets_formatting as formatting
+from kaiano.google import GoogleAPI
+from kaiano.google import sheets_formatting as formatting
 
 log = log.get_logger()
 
