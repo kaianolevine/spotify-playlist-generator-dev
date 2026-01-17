@@ -121,6 +121,7 @@ def process_file(
         new_songs = process_new_songs(songs, last_extvdj_line)
 
         if not new_songs:
+            log.info(f"⏭ No new songs found in {filename}")
             return
 
         found_uris: list[str] = []
@@ -134,6 +135,10 @@ def process_file(
                 matched_songs.append((artist, title))
             else:
                 unfound.append((artist, title, extvdj_line))
+
+        log.info(
+            f"🔎 {filename}: {len(matched_songs)} found on Spotify, {len(unfound)} not found"
+        )
 
         update_spotify_radio_playlist(sp, config.SPOTIFY_PLAYLIST_ID, found_uris)
         playlist_id = create_spotify_playlist_for_file(sp, date, found_uris)
@@ -163,17 +168,24 @@ def main() -> None:
     load_dotenv()
 
     g = GoogleAPI.from_env()
+    log.info("✅ Google API initialized")
+
     sp = SpotifyAPI.from_env()
+    log.info("✅ Spotify API initialized")
+
     m3u_tool = M3UToolbox()
+    log.info("✅ M3U toolbox initialized")
 
     logger = SpreadsheetLogger(
         g,
         folder_id=config.HISTORY_TO_SPOTIFY_FOLDER_ID,
         spreadsheet_name=config.HISTORY_TO_SPOTIFY_SPREADSHEET_NAME,
     )
+    log.info(f"📄 Logging spreadsheet ready (ID: {logger.spreadsheet_id})")
     logger.log_start()
 
     m3u_files = g.drive.get_all_m3u_files()
+    log.info(f"🎶 Found {len(m3u_files)} .m3u files to process")
     if not m3u_files:
         logger.log_info_sheet("❌ No .m3u files found.")
         return
@@ -181,9 +193,11 @@ def main() -> None:
     processed_map = logger.load_processed_map()
 
     for file in m3u_files:
+        log.info(f"➡️ Processing M3U file: {file.get('name')}")
         process_file(file, processed_map, g, m3u_tool, sp, logger)
 
     logger.format()
+    log.info("🏁 Spotify history sync complete")
     logger.log_info_sheet("✅ Sync complete.")
 
 
