@@ -166,13 +166,11 @@ def main() -> None:
     sp = SpotifyAPI.from_env()
     m3u_tool = M3UToolbox()
 
-    logger = SpreadsheetLogger(g)
-    spreadsheet_id = logger.get_logging_spreadsheet(
-        config.HISTORY_TO_SPOTIFY_FOLDER_ID,
-        config.HISTORY_TO_SPOTIFY_SPREADSHEET_NAME,
+    logger = SpreadsheetLogger(
+        g,
+        folder_id=config.HISTORY_TO_SPOTIFY_FOLDER_ID,
+        spreadsheet_name=config.HISTORY_TO_SPOTIFY_SPREADSHEET_NAME,
     )
-    logger = logger.with_spreadsheet(spreadsheet_id)
-
     logger.log_start()
 
     m3u_files = g.drive.get_all_m3u_files()

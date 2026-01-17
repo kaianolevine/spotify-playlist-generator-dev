@@ -12,58 +12,61 @@ log = log.get_logger()
 
 
 class SpreadsheetLogger:
-    def __init__(self, g: GoogleAPI, *, spreadsheet_id: str | None = None):
+    def __init__(
+        self,
+        g: GoogleAPI,
+        *,
+        folder_id: str,
+        spreadsheet_name: str,
+    ):
         self.g = g
-        self.spreadsheet_id = spreadsheet_id
+        self.folder_id = folder_id
+        self.spreadsheet_name = spreadsheet_name
 
-    def with_spreadsheet(self, spreadsheet_id: str) -> "SpreadsheetLogger":
-        self.spreadsheet_id = spreadsheet_id
-        return self
-
-    def _require_spreadsheet_id(self) -> str:
-        if not self.spreadsheet_id:
-            raise ValueError("spreadsheet_id is required for this operation")
-        return self.spreadsheet_id
+        self.spreadsheet_id = self._get_or_create_logging_spreadsheet()
 
     def delete_sheet_by_name(self, sheet_name: str) -> None:
         """Delete a sheet tab by its title."""
-        spreadsheet_id = self._require_spreadsheet_id()
-        meta = self.g.sheets.get_metadata(spreadsheet_id)
+        meta = self.g.sheets.get_metadata(self.spreadsheet_id)
         for sheet in meta.get("sheets", []):
             props = sheet.get("properties", {})
             if props.get("title") == sheet_name:
                 sheet_id = props.get("sheetId")
                 self.g.sheets.batch_update(
-                    spreadsheet_id, [{"deleteSheet": {"sheetId": sheet_id}}]
+                    self.spreadsheet_id, [{"deleteSheet": {"sheetId": sheet_id}}]
                 )
                 return
 
-    def get_logging_spreadsheet(self, folder_id: str, spreadsheet_name: str) -> str:
+    def _get_or_create_logging_spreadsheet(self) -> str:
         """
         Locate the logging spreadsheet by name in the configured folder, or create it if missing.
         Ensures the required sheets exist.
         """
-        files = self.g.drive.list_files(folder_id, trashed=False, include_folders=True)
+        files = self.g.drive.list_files(
+            self.folder_id, trashed=False, include_folders=True
+        )
         for f in files:
-            if f.name == spreadsheet_name and (f.mime_type or "").startswith(
+            if f.name == self.spreadsheet_name and (f.mime_type or "").startswith(
                 "application/vnd.google-apps.spreadsheet"
             ):
                 spreadsheet_id = f.id
-                self.setup_logging_spreadsheet(spreadsheet_id)
+                self.spreadsheet_id = spreadsheet_id
+                self._setup_logging_spreadsheet()
                 return spreadsheet_id
 
         spreadsheet_id = self.g.drive.create_spreadsheet_in_folder(
-            spreadsheet_name, folder_id
+            self.spreadsheet_name, self.folder_id
         )
+        self.spreadsheet_id = spreadsheet_id
 
         if not self.wait_for_spreadsheet_ready(spreadsheet_id):
             log.error(
                 "❌ Spreadsheet did not become ready in time, continuing anyway..."
             )
 
-        self.setup_logging_spreadsheet(spreadsheet_id)
+        self._setup_logging_spreadsheet()
         log.info(
-            f"Created new logging spreadsheet '{spreadsheet_name}' in folder {folder_id}."
+            f"Created new logging spreadsheet '{self.spreadsheet_name}' in folder {self.folder_id}."
         )
         return spreadsheet_id
 
@@ -82,7 +85,7 @@ class SpreadsheetLogger:
                 time.sleep(delay)
         return False
 
-    def setup_logging_spreadsheet(self, spreadsheet_id: str) -> None:
+    def _setup_logging_spreadsheet(self) -> None:
         """
         Ensure the logging spreadsheet contains only the required sheets with correct headers.
         """
@@ -94,14 +97,20 @@ class SpreadsheetLogger:
         }
         for sheet_name, headers in required_sheets.items():
             self.g.sheets.ensure_sheet_exists(
-                spreadsheet_id, sheet_name, headers=headers
+                self._require_spreadsheet_id(), sheet_name, headers=headers
             )
         try:
-            metadata = self.g.sheets.get_metadata(spreadsheet_id)
+            metadata = self.g.sheets.get_metadata(self._require_spreadsheet_id())
             for sheet_info in metadata.get("sheets", []):
-                title = sheet_info.get("properties", {}).get("title", "")
-                if title not in required_sheets:
-                    self.delete_sheet_by_name(title)
+                props = sheet_info.get("properties", {})
+                title = props.get("title", "")
+                sheet_id = props.get("sheetId")
+
+                if title not in required_sheets and sheet_id is not None:
+                    self.g.sheets.batch_update(
+                        self._require_spreadsheet_id(),
+                        [{"deleteSheet": {"sheetId": sheet_id}}],
+                    )
                     log.info(f"🗑 Deleted extraneous sheet '{title}'.")
         except HttpError as e:
             log.error(f"⚠️ Failed to clean up sheets: {e}")
@@ -112,10 +121,9 @@ class SpreadsheetLogger:
         values: list[list[str]],
         value_input_option: str = "RAW",
     ) -> None:
-        spreadsheet_id = self._require_spreadsheet_id()
         try:
             self.g.sheets.append_values(
-                spreadsheet_id,
+                self.spreadsheet_id,
                 range_name,
                 values,
                 value_input_option=value_input_option,
@@ -279,5 +287,4 @@ class SpreadsheetLogger:
         )
 
     def format(self) -> None:
-        spreadsheet_id = self._require_spreadsheet_id()
-        formatting.apply_formatting_to_sheet(spreadsheet_id)
+        formatting.apply_formatting_to_sheet(self.spreadsheet_id)
