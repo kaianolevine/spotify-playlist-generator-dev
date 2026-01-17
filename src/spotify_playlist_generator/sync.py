@@ -3,11 +3,11 @@ from __future__ import annotations
 import os
 import tempfile
 
-import kaiano.logger as log
+import kaiano_common_utils.logger as log
 from dotenv import load_dotenv
-from kaiano.google import GoogleAPI
-from kaiano.spotify import SpotifyAPI
-from kaiano.vdj.m3u.api import M3UToolbox
+from kaiano_common_utils.google import GoogleAPI
+from kaiano_common_utils.spotify import SpotifyAPI
+from kaiano_common_utils.vdj.m3u.api import M3UToolbox
 
 from spotify_playlist_generator import config
 from spotify_playlist_generator.sheet_logging import SpreadsheetLogger
