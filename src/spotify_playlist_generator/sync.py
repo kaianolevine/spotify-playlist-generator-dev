@@ -139,13 +139,13 @@ def process_file(
         playlist_id = create_spotify_playlist_for_file(sp, date, found_uris)
 
         logger.log_to_sheets(
-            date=date,
-            matched_songs=matched_songs,
-            found_uris=found_uris,
-            unfound=unfound,
-            filename=filename,
-            new_songs=new_songs,
-            last_extvdj_line=last_extvdj_line,
+            date,
+            matched_songs,
+            found_uris,
+            unfound,
+            filename,
+            new_songs,
+            last_extvdj_line,
             playlist_id=playlist_id,
         )
 
