@@ -23,7 +23,7 @@ class SpreadsheetLogger:
         self.folder_id = folder_id
         self.spreadsheet_name = spreadsheet_name
 
-        self.spreadsheet_id = self._get_or_create_logging_spreadsheet()
+        self.spreadsheet_id = self._get_logging_spreadsheet()
 
     def delete_sheet_by_name(self, sheet_name: str) -> None:
         """Delete a sheet tab by its title."""
@@ -37,7 +37,7 @@ class SpreadsheetLogger:
                 )
                 return
 
-    def _get_or_create_logging_spreadsheet(self) -> str:
+    def _get_logging_spreadsheet(self) -> str:
         """
         Locate the logging spreadsheet by name in the configured folder, or create it if missing.
         Ensures the required sheets exist.
@@ -59,7 +59,7 @@ class SpreadsheetLogger:
         )
         self.spreadsheet_id = spreadsheet_id
 
-        if not self.wait_for_spreadsheet_ready(spreadsheet_id):
+        if not self._wait_for_spreadsheet_ready(spreadsheet_id):
             log.error(
                 "❌ Spreadsheet did not become ready in time, continuing anyway..."
             )
@@ -70,7 +70,7 @@ class SpreadsheetLogger:
         )
         return spreadsheet_id
 
-    def wait_for_spreadsheet_ready(
+    def _wait_for_spreadsheet_ready(
         self, spreadsheet_id: str, retries: int = 5, delay: int = 1
     ) -> bool:
         """Poll until the spreadsheet metadata can be fetched."""
