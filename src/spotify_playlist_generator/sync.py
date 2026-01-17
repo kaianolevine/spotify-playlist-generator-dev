@@ -9,10 +9,7 @@ from dotenv import load_dotenv
 from kaiano_common_utils.api.google import GoogleAPI
 from kaiano_common_utils.api.spotify.spotify import SpotifyAPI
 from kaiano_common_utils.library.vdj.m3u.api import M3UToolbox
-
-import spotify_playlist_generator.config as config
-
-from .sheet_logging import (
+from sheet_logging import (
     format,
     get_or_create_logging_spreadsheet,
     load_processed_map,
@@ -20,6 +17,8 @@ from .sheet_logging import (
     log_start,
     log_to_sheets,
 )
+
+import spotify_playlist_generator.config as config
 
 log = log.get_logger()
 
