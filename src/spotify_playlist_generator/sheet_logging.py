@@ -3,12 +3,11 @@ from __future__ import annotations
 import time
 from datetime import datetime
 
-import kaiano.logger as log
 from googleapiclient.errors import HttpError
+from kaiano import logger as logger_mod
 from kaiano.google import GoogleAPI
-from kaiano.google import sheets_formatting as formatting
 
-log = log.get_logger()
+log = logger_mod.get_logger()
 
 
 class SpreadsheetLogger:
@@ -287,4 +286,4 @@ class SpreadsheetLogger:
         )
 
     def format(self) -> None:
-        formatting.apply_formatting_to_sheet(self.spreadsheet_id)
+        self.g.sheets.formatter.apply_formatting_to_sheet(self.spreadsheet_id)
