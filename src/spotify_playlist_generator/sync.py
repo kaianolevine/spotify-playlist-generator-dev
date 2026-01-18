@@ -7,7 +7,7 @@ import kaiano.logger as log
 from dotenv import load_dotenv
 from kaiano.google import GoogleAPI
 from kaiano.spotify import SpotifyAPI
-from kaiano.vdj.m3u.api import M3UToolbox
+from kaiano.vdj.m3u.m3u import M3UToolbox
 
 from spotify_playlist_generator import config
 from spotify_playlist_generator.sheet_logging import SpreadsheetLogger
