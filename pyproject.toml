@@ -9,7 +9,7 @@ packages = [{ include = "spotify_playlist_generator", from = "src" }]
 
 [tool.poetry.dependencies]
 python = ">=3.10,<4.0"
-kaiano_common_utils = {git = "https://github.com/kaianolevine/kaiano-common-utils.git", rev = "main"}
+kaiano = {git = "https://github.com/kaianolevine/kaiano-common-utils.git", rev = "main"}
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.0"
