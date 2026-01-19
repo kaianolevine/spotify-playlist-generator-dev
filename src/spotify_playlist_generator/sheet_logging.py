@@ -3,7 +3,6 @@ from __future__ import annotations
 import time
 from datetime import datetime
 
-from googleapiclient.errors import HttpError
 from kaiano import logger as logger_mod
 from kaiano.google import GoogleAPI
 
@@ -111,7 +110,7 @@ class SpreadsheetLogger:
                         [{"deleteSheet": {"sheetId": sheet_id}}],
                     )
                     log.info(f"🗑 Deleted extraneous sheet '{title}'.")
-        except HttpError as e:
+        except Exception as e:
             log.error(f"⚠️ Failed to clean up sheets: {e}")
 
     def _append_values(
