@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "spotify_playlist_generator"
-version = "0.0.77"
+version = "0.0.78"
 description = "Starter template for Kaiano's Python projects with CI, pre-commit, coverage, and shared utils."
 authors = ["Kaiano Levine <kaiano@example.com>"]
 license = "MIT"
