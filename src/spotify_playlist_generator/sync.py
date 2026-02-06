@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import json
 import os
 import tempfile
+from datetime import datetime, timezone
+from typing import Any
 
 import kaiano.logger as log
 from dotenv import load_dotenv
@@ -20,6 +23,152 @@ DEFAULT_PLAYLIST_DESCRIPTION = (
     "Spreadsheets of history and song-not-found logs can be found at "
     "www.kaianolevine.com/dj-marvel"
 )
+
+
+# ---------------------------
+# Playlist snapshot utilities
+# ---------------------------
+
+
+def _now_utc_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _first_attr(obj: Any, names: list[str]) -> Any:
+    """Return the first existing attribute value on obj from a list of names."""
+    for n in names:
+        if hasattr(obj, n):
+            return getattr(obj, n)
+    return None
+
+
+def _call_first(sp: Any, method_names: list[str], *args: Any, **kwargs: Any) -> Any:
+    """Call the first method that exists on sp; return its result."""
+    for name in method_names:
+        fn = getattr(sp, name, None)
+        if callable(fn):
+            return fn(*args, **kwargs)
+    raise AttributeError(f"None of these methods exist on SpotifyAPI: {method_names}")
+
+
+def _extract_external_url(playlist: dict) -> str:
+    # Spotify returns external_urls: {spotify: 'https://open.spotify.com/playlist/...'}
+    external = playlist.get("external_urls") or {}
+    if isinstance(external, dict):
+        return external.get("spotify", "") or ""
+    return ""
+
+
+def _normalize_playlist_item(p: dict) -> dict:
+    """Normalize a Spotify playlist object into a stable JSON-friendly dict."""
+    owner = p.get("owner") or {}
+    tracks = p.get("tracks") or {}
+
+    return {
+        "id": p.get("id", ""),
+        "name": p.get("name", ""),
+        "url": _extract_external_url(p),
+        "uri": p.get("uri", ""),
+        "type": p.get("type", "playlist"),
+        "public": p.get("public"),
+        "collaborative": p.get("collaborative"),
+        "snapshot_id": p.get("snapshot_id", ""),
+        "tracks_total": tracks.get("total"),
+        "owner": {
+            "id": owner.get("id", ""),
+            "display_name": owner.get("display_name", ""),
+        },
+    }
+
+
+def fetch_all_playlists(sp: Any) -> list[dict]:
+    """Fetch all playlists visible to the account.
+
+    This is intentionally defensive because SpotifyAPI wrappers differ.
+    We try a handful of common method names; if none exist, we log and return [].
+
+    Expected return shape is a list of raw Spotify playlist dicts.
+    """
+    # 1) If your wrapper already has a direct helper, prefer it.
+    try:
+        return _call_first(
+            sp,
+            [
+                "get_all_playlists",
+                "get_user_playlists",
+                "list_playlists",
+                "get_playlists",
+                "fetch_playlists",
+            ],
+        )
+    except Exception:
+        pass
+
+    # 2) Try to find an underlying spotipy-like client.
+    client = _first_attr(sp, ["client", "spotify", "sp", "_client", "_sp"])
+    if client is None:
+        return []
+
+    # spotipy style: current_user_playlists(limit=50, offset=0) -> {items: [...], next: ...}
+    fn = getattr(client, "current_user_playlists", None)
+    if not callable(fn):
+        return []
+
+    items: list[dict] = []
+    limit = 50
+    offset = 0
+
+    while True:
+        page = fn(limit=limit, offset=offset)
+        if not isinstance(page, dict):
+            break
+
+        page_items = page.get("items") or []
+        if isinstance(page_items, list):
+            items.extend(page_items)
+
+        # Prefer Spotify pagination semantics when available.
+        if page.get("next"):
+            offset += limit
+            continue
+
+        break
+
+    return items
+
+
+def write_playlist_snapshot_json(sp: Any) -> str | None:
+    """Write a JSON snapshot of all playlists to disk and return the output path."""
+    # Determine output path.
+    json_output_path = (
+        os.getenv("SPOTIFY_PLAYLIST_SNAPSHOT_JSON_PATH")
+        or getattr(config, "SPOTIFY_PLAYLIST_SNAPSHOT_JSON_PATH", None)
+        or "site_data/spotify_playlists.json"
+    )
+
+    raw_playlists = fetch_all_playlists(sp)
+    normalized = [
+        _normalize_playlist_item(p) for p in raw_playlists if isinstance(p, dict)
+    ]
+
+    snapshot = {
+        "generated_at": _now_utc_iso(),
+        "playlist_count": len(normalized),
+        "playlists": sorted(
+            normalized, key=lambda x: (x.get("name", "") or "").lower()
+        ),
+    }
+
+    try:
+        os.makedirs(os.path.dirname(json_output_path) or ".", exist_ok=True)
+        with open(json_output_path, "w", encoding="utf-8") as f:
+            json.dump(snapshot, f, ensure_ascii=False, indent=2)
+        return json_output_path
+    except Exception:
+        log.exception(
+            f"❌ Failed to write playlist snapshot JSON to: {json_output_path}"
+        )
+        return None
 
 
 def extract_date_from_filename(filename: str) -> str:
@@ -172,6 +321,16 @@ def main() -> None:
 
     sp = SpotifyAPI.from_env()
     log.info("✅ Spotify API initialized")
+
+    # Build a JSON snapshot of all playlists visible to this Spotify account.
+    # This is useful for rendering playlist lists on the website, similar to DJ set collection snapshots.
+    snapshot_path = write_playlist_snapshot_json(sp)
+    if snapshot_path:
+        log.info(f"🧾 Wrote Spotify playlist snapshot JSON to: {snapshot_path}")
+    else:
+        log.warning(
+            "⚠️ Spotify playlist snapshot JSON was not written (see logs above)."
+        )
 
     m3u_tool = M3UToolbox()
     log.info("✅ M3U toolbox initialized")

@@ -28,3 +28,28 @@ jobs:
         run: poetry install
       - name: Run sync script
         run: poetry run python src/spotify_playlist_generator/sync.py
+
+      - name: Checkout kaiano-api repo
+        uses: actions/checkout@v4
+        with:
+          repository: kaianolevine/kaiano-api
+          path: website
+          token: ${{ secrets.KAIANO_API_REPO_TOKEN }}
+
+      - name: Copy Spotify playlists snapshot JSON into website repo
+        run: |
+          mkdir -p website/src/json-site-data/spotify
+          cp -f site_data/spotify_playlists.json website/src/json-site-data/spotify/spotify_playlists.json
+
+      - name: Commit and push website repo (if changed)
+        run: |
+          cd website
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/json-site-data/spotify/spotify_playlists.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "Update Spotify playlists snapshot JSON"
+          git push
